@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip 
 } from 'recharts';
@@ -25,6 +25,9 @@ const Dashboard: React.FC = () => {
   const [userFeedback, setUserFeedback] = useState('');
   const [feedbackLogs, setFeedbackLogs] = useState<{ id: string; text: string; timestamp: string; taskId: string }[]>([]);
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [showFeedbackSuccess, setShowFeedbackSuccess] = useState(false);
+
+  const feedbackRef = useRef<HTMLDivElement>(null);
 
   const [analysisResult, setAnalysisResult] = useState<{
     anomalies: string[];
@@ -76,7 +79,8 @@ const Dashboard: React.FC = () => {
 
   const handleRunA2ASimulation = async () => {
     setIsProcessingA2A(true);
-    setA2aResponse(null); // Clear previous
+    setA2aResponse(null);
+    setShowFeedbackSuccess(false);
     const request: A2ARequest = {
       task_id: `BEATS-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
       instruction: a2aInstruction,
@@ -85,6 +89,10 @@ const Dashboard: React.FC = () => {
     try {
       const result = await processA2ATask(request, selectedAgent);
       setA2aResponse(result);
+      // Auto-scroll to feedback prompt after short delay
+      setTimeout(() => {
+        feedbackRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 500);
     } finally {
       setIsProcessingA2A(false);
     }
@@ -94,18 +102,20 @@ const Dashboard: React.FC = () => {
     if (!userFeedback.trim() || !a2aResponse) return;
     setIsSubmittingFeedback(true);
     
-    // Simulate logging feedback
     const newLog = {
       id: Math.random().toString(36).substr(2, 9),
       text: userFeedback,
       timestamp: new Date().toLocaleTimeString(),
-      taskId: a2aResponse.payload.metadata.timestamp // Using timestamp as proxy for task unique identifier in mock
+      taskId: a2aResponse.payload.metadata.timestamp 
     };
 
     setTimeout(() => {
       setFeedbackLogs(prev => [newLog, ...prev]);
       setUserFeedback('');
       setIsSubmittingFeedback(false);
+      setShowFeedbackSuccess(true);
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => setShowFeedbackSuccess(false), 3000);
     }, 600);
   };
 
@@ -221,19 +231,19 @@ const Dashboard: React.FC = () => {
           </div>
           
           {/* Feedback History Log */}
-          <div className="bg-[#111] border border-white/5 p-6 rounded-2xl h-[280px] flex flex-col">
+          <div className="bg-[#111] border border-white/5 p-6 rounded-2xl h-[340px] flex flex-col">
             <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
               <i className="fa-solid fa-clock-rotate-left text-amber-500"></i> Research Feedback Log
             </h3>
             <div className="flex-grow overflow-y-auto space-y-3 pr-1 custom-scrollbar">
               {feedbackLogs.length > 0 ? (
                 feedbackLogs.map((log) => (
-                  <div key={log.id} className="bg-white/5 p-2.5 rounded-lg border border-white/5 text-[10px]">
+                  <div key={log.id} className="bg-white/5 p-2.5 rounded-lg border border-white/5 text-[10px] animate-in slide-in-from-left-2">
                     <div className="flex justify-between mb-1">
                       <span className="text-amber-500/80 font-bold uppercase tracking-tighter">RLHF REFINEMENT</span>
                       <span className="text-gray-600 font-mono">{log.timestamp}</span>
                     </div>
-                    <p className="text-gray-400 italic line-clamp-3">"{log.text}"</p>
+                    <p className="text-gray-400 italic leading-relaxed">"{log.text}"</p>
                   </div>
                 ))
               ) : (
@@ -314,7 +324,7 @@ const Dashboard: React.FC = () => {
           </div>
 
           {/* A2A Simulation Container with Feedback Loop */}
-          <div className="bg-[#111] border border-white/5 p-6 rounded-2xl relative">
+          <div className="bg-[#111] border border-white/5 p-6 rounded-2xl relative shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xs font-bold text-gray-300 uppercase tracking-widest flex items-center gap-2">
                 <i className="fa-solid fa-terminal text-emerald-500"></i>
@@ -348,7 +358,7 @@ const Dashboard: React.FC = () => {
                         <span className="text-[9px] font-bold text-emerald-400">A2A_JSON_PAYLOAD</span>
                         <i className="fa-solid fa-check text-[8px] text-emerald-500"></i>
                       </div>
-                      <pre className="text-[10px] text-emerald-500/90 overflow-x-auto font-mono leading-relaxed">
+                      <pre className="text-[10px] text-emerald-500/90 overflow-x-auto font-mono leading-relaxed h-32 custom-scrollbar">
                         {JSON.stringify(a2aResponse.payload, null, 2)}
                       </pre>
                     </div>
@@ -357,7 +367,7 @@ const Dashboard: React.FC = () => {
                         <h4 className="text-[9px] text-gray-500 font-bold uppercase mb-2 flex items-center gap-1">
                           <i className="fa-solid fa-microscope text-violet-400"></i> RLHF Logic Trace
                         </h4>
-                        <p className="text-[10px] text-gray-400 leading-relaxed font-light">{a2aResponse.reasoning_log}</p>
+                        <p className="text-[10px] text-gray-400 leading-relaxed font-light line-clamp-4">{a2aResponse.reasoning_log}</p>
                       </div>
                       <div className="pt-3 border-t border-white/5">
                         <h4 className="text-[9px] text-violet-400 font-bold uppercase mb-1">Self-Critique Modality</h4>
@@ -367,28 +377,36 @@ const Dashboard: React.FC = () => {
                   </div>
 
                   {/* Integrated Feedback Loop Mechanism */}
-                  <div className="bg-violet-500/5 border border-violet-500/20 rounded-xl p-5 animate-in slide-in-from-top-2">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-8 h-8 rounded-full bg-violet-500/20 flex items-center justify-center text-violet-400">
-                        <i className="fa-solid fa-user-gear text-sm"></i>
+                  <div ref={feedbackRef} className="bg-violet-500/5 border border-violet-500/20 rounded-xl p-5 animate-in slide-in-from-top-4 shadow-lg ring-1 ring-violet-500/10">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-violet-500/20 flex items-center justify-center text-violet-400">
+                          <i className="fa-solid fa-user-gear text-sm"></i>
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-violet-300">Human-In-The-Loop Feedback</h4>
+                          <p className="text-[10px] text-violet-500/70 italic">Was the RLHF Critique accurate? Refine the reasoning loop:</p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="text-xs font-bold text-violet-300">Human-In-The-Loop Feedback</h4>
-                        <p className="text-[10px] text-violet-500/70">Refine agent reasoning based on RLHF Critique results</p>
-                      </div>
+                      {showFeedbackSuccess && (
+                        <div className="text-[9px] text-emerald-400 font-bold animate-pulse bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20">
+                          <i className="fa-solid fa-check-circle mr-1"></i> Feedback logged to Research Node session
+                        </div>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <input 
                         type="text"
                         value={userFeedback}
                         onChange={(e) => setUserFeedback(e.target.value)}
-                        placeholder="Critique this result (e.g., 'Increase energy efficiency focus')"
-                        className="flex-grow bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-xs focus:ring-1 focus:ring-violet-500/40 outline-none transition-all"
+                        placeholder="Provide feedback on the critique or result..."
+                        className="flex-grow bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-xs focus:ring-1 focus:ring-violet-500/40 outline-none transition-all placeholder:text-gray-700"
+                        onKeyDown={(e) => e.key === 'Enter' && handleFeedbackSubmit()}
                       />
                       <button 
                         onClick={handleFeedbackSubmit}
                         disabled={isSubmittingFeedback || !userFeedback.trim()}
-                        className="bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-lg text-[10px] font-bold transition-all disabled:opacity-50 flex items-center gap-2"
+                        className="bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-lg text-[10px] font-bold transition-all disabled:opacity-50 flex items-center gap-2 whitespace-nowrap shadow-lg shadow-violet-500/20"
                       >
                         {isSubmittingFeedback ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}
                         LOG FEEDBACK
