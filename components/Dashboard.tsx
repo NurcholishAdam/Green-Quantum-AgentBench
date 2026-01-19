@@ -15,11 +15,11 @@ const Dashboard: React.FC = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [isProcessingA2A, setIsProcessingA2A] = useState(false);
   
-  const [searchQuery, setSearchQuery] = useState('Green AI standardization 2024');
+  const [searchQuery, setSearchQuery] = useState('Green AI standardization 2025 energy metrics');
   const [searchResults, setSearchResults] = useState<SearchResult | null>(null);
   const [report, setReport] = useState<string | null>(null);
   const [a2aResponse, setA2aResponse] = useState<A2AResponse | null>(null);
-  const [a2aInstruction, setA2aInstruction] = useState('Optimize data ingestion pipeline for minimal entropy.');
+  const [a2aInstruction, setA2aInstruction] = useState('Evaluate multi-modal entropy reduction in the quantum-limit pipeline.');
   
   const [analysisResult, setAnalysisResult] = useState<{
     anomalies: string[];
@@ -61,9 +61,12 @@ const Dashboard: React.FC = () => {
 
   const handleGenerateReport = async () => {
     setIsGenerating(true);
-    const res = await generateAgentBeatsProposal(selectedAgent);
-    setReport(res || "Generation failed.");
-    setIsGenerating(false);
+    try {
+      const res = await generateAgentBeatsProposal(selectedAgent);
+      setReport(res || "Generation failed.");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleRunA2ASimulation = async () => {
@@ -71,21 +74,23 @@ const Dashboard: React.FC = () => {
     const request: A2ARequest = {
       task_id: `BEATS-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
       instruction: a2aInstruction,
-      constraints: ["Green Principles v2", "Quantum Accuracy > 95%", "ISO-A2A Payload JSON"]
+      constraints: ["A2A Compliance v2.1", "Green Principles Standard", "JSON Payload Output"]
     };
-    const result = await processA2ATask(request, selectedAgent);
-    setA2aResponse(result);
-    setIsProcessingA2A(false);
+    try {
+      const result = await processA2ATask(request, selectedAgent);
+      setA2aResponse(result);
+    } finally {
+      setIsProcessingA2A(false);
+    }
   };
 
   const handleAnalyzeProvenance = async () => {
     setIsAnalyzing(true);
     const mockLogs = `
-      [TIMESTAMP: ${Date.now()}] AGENT: ${selectedAgent.name}
-      [STATE] LOGIC_GATE_ACTIVE: 0x442FF
+      [TIMESTAMP: ${new Date().toISOString()}] AGENT: ${selectedAgent.name}
       [PROVENANCE] TRACE: node_a1 -> node_q1 -> node_e1
-      [SIGNAL] COHERENCE_LEVEL: 0.882
-      [ERROR] SYNDROME_DETECTED: PHASE_FLIP_RECURSION
+      [SIGNAL] COHERENCE_LEVEL: 0.941
+      [ERROR] SYNDROME_DETECTED: PHASE_FLIP_RECURSION_002
     `;
     try {
       const result = await analyzeQuantumProvenance(mockLogs);
@@ -105,7 +110,7 @@ const Dashboard: React.FC = () => {
       const result = await searchGreenStandards(searchQuery);
       setSearchResults(result);
     } catch (e) {
-      console.error(e);
+      console.error("Search failed", e);
     } finally {
       setIsSearching(false);
     }
@@ -113,31 +118,38 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="p-4 md:p-8 space-y-8 animate-in fade-in duration-1000">
-      {/* Header Section */}
+      {/* Header Section with Competition Badges */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-          <div className="flex items-center space-x-3 mb-2">
-            <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/20 rounded">A2A COMPLIANT</span>
-            <span className="px-2 py-0.5 bg-violet-500/10 text-violet-400 text-[10px] font-bold border border-violet-500/20 rounded">DOCKER INDEPENDENT</span>
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-[9px] font-bold border border-emerald-500/20 rounded uppercase tracking-tighter flex items-center gap-1">
+              <i className="fa-solid fa-check-circle"></i> A2A Compliance v2.1
+            </span>
+            <span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[9px] font-bold border border-blue-500/20 rounded uppercase tracking-tighter flex items-center gap-1">
+              <i className="fa-brands fa-docker"></i> Dockerized Independence
+            </span>
+            <span className="px-2 py-0.5 bg-violet-500/10 text-violet-400 text-[9px] font-bold border border-violet-500/20 rounded uppercase tracking-tighter flex items-center gap-1">
+              <i className="fa-solid fa-brain"></i> RLHF Feedback Loop
+            </span>
           </div>
           <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-violet-500">
             Green-Quantum AgentBench
           </h1>
-          <p className="text-gray-400 mt-2 max-w-2xl">
-            Autonomous agent benchmarking aligned with AgentBeats competition principles. 
-            Robust scoring, A2A JSON payloads, and RLHF-integrated feedback loops.
+          <p className="text-gray-400 text-sm max-w-2xl font-light leading-relaxed">
+            Benchmarking architecture optimized for the <span className="text-emerald-500 font-medium italic">AgentBeats</span> competition. 
+            Utilizing high-reasoning Gemini 3 models for A2A-standard payload synthesis and green synchronization.
           </p>
         </div>
         
-        <div className="flex items-center space-x-3 bg-white/5 border border-white/10 p-1 rounded-lg">
+        <div className="flex items-center space-x-2 bg-white/5 border border-white/10 p-1.5 rounded-xl">
           {MOCK_AGENTS.map(agent => (
             <button
               key={agent.id}
               onClick={() => setSelectedAgentId(agent.id)}
-              className={`px-4 py-2 text-xs font-bold rounded transition-all ${
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all duration-300 ${
                 selectedAgentId === agent.id 
-                  ? 'bg-emerald-500/20 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]' 
-                  : 'text-gray-500 hover:text-gray-300'
+                  ? 'bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)] scale-105' 
+                  : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
               }`}
             >
               {agent.name}
@@ -146,30 +158,35 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Container Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {/* Main Grid: Research, Simulation, and Results */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Left Stats & Radar - Column 1 */}
-        <div className="space-y-6 lg:col-span-1">
-          <div className="bg-[#111] border border-white/5 p-6 rounded-xl">
-             <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-6">Efficiency Radar</h3>
-             <ResponsiveContainer width="100%" height={250}>
+        {/* Left Stats Console - 3 Columns */}
+        <div className="lg:col-span-3 space-y-6">
+          <div className="bg-[#111] border border-white/5 p-6 rounded-2xl shadow-xl">
+             <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-6 flex items-center gap-2">
+               <i className="fa-solid fa-compass text-emerald-500"></i> Efficiency Profile
+             </h3>
+             <ResponsiveContainer width="100%" height={240}>
                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
-                  <PolarGrid stroke="#333" />
-                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#999', fontSize: 9 }} />
+                  <PolarGrid stroke="#222" />
+                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#666', fontSize: 8 }} />
                   <Radar
                     name={selectedAgent.name}
                     dataKey="A"
                     stroke="#10b981"
                     fill="#10b981"
-                    fillOpacity={0.2}
+                    fillOpacity={0.15}
                   />
+                  <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #333', fontSize: '10px' }} />
                </RadarChart>
              </ResponsiveContainer>
           </div>
 
-          <div className="bg-[#111] border border-white/5 p-6 rounded-xl space-y-4">
-            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-2">Metrics Console</h3>
+          <div className="bg-[#111] border border-white/5 p-6 rounded-2xl space-y-4">
+            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+              <i className="fa-solid fa-microchip text-violet-500"></i> Runtime Metrics
+            </h3>
             <MetricItem label="Green Score" val={`${selectedAgent.greenScore}%`} color="emerald" />
             <MetricItem label="QEC Resilience" val={`${selectedAgent.quantumErrorCorrection}%`} color="violet" />
             <MetricItem label="Provenance" val={`${selectedAgent.provenanceClarity}%`} color="blue" />
@@ -177,17 +194,81 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Center: A2A Simulation & Research - Column 2-3 */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* Center Section: Search & A2A Simulation - 6 Columns */}
+        <div className="lg:col-span-6 space-y-6">
           
-          {/* A2A Protocol Simulator */}
-          <div className="bg-[#111] border border-white/5 p-6 rounded-xl relative overflow-hidden">
+          {/* Dedicated Search Intelligence Section */}
+          <div className="bg-[#111] border border-white/5 p-6 rounded-2xl shadow-2xl relative group overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+              <i className="fa-solid fa-earth-americas text-6xl text-blue-500"></i>
+            </div>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest flex items-center space-x-2">
-                <i className="fa-solid fa-code-branch text-emerald-500"></i>
-                <span>A2A Protocol Simulation</span>
+              <h3 className="text-xs font-bold text-gray-300 uppercase tracking-widest flex items-center gap-2">
+                <i className="fa-brands fa-google text-blue-400"></i>
+                <span>Search Grounding Intelligence</span>
               </h3>
-              <div className="text-[10px] text-gray-600 font-mono">STRICT JSON PAYLOAD</div>
+              <div className="flex items-center gap-1 text-[8px] font-bold text-blue-400/60 bg-blue-400/10 px-2 py-0.5 rounded-full border border-blue-400/20">
+                <div className="w-1 h-1 rounded-full bg-blue-400 animate-pulse"></div>
+                GEMINI-3-FLASH
+              </div>
+            </div>
+            
+            <form onSubmit={handleSearchStandards} className="relative mb-6">
+              <input 
+                type="text" 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50 transition-all text-gray-200 placeholder:text-gray-600"
+                placeholder="Synchronize with latest Green Principle standardizations..."
+              />
+              <button 
+                type="submit"
+                disabled={isSearching} 
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all disabled:opacity-50 flex items-center gap-2"
+              >
+                {isSearching ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-magnifying-glass"></i>}
+                RESEARCH
+              </button>
+            </form>
+
+            <div className="h-44 overflow-y-auto space-y-4 pr-2 custom-scrollbar border-t border-white/5 pt-4">
+              {searchResults ? (
+                <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                  <p className="text-xs text-gray-400 leading-relaxed font-light mb-4 whitespace-pre-wrap">{searchResults.text}</p>
+                  <div className="space-y-2">
+                    <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest">Grounding Sources</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {searchResults.sources.map((src, i) => (
+                        <a 
+                          key={i} 
+                          href={src.uri} 
+                          target="_blank" 
+                          className="flex items-center gap-2 text-[9px] text-blue-400 hover:text-blue-300 bg-blue-500/5 p-2 rounded-lg border border-blue-500/10 hover:border-blue-500/30 transition-all"
+                        >
+                          <i className="fa-solid fa-link text-[8px] opacity-60"></i>
+                          <span className="truncate">{src.title || src.uri}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-gray-700 opacity-40 italic space-y-2">
+                  <i className="fa-solid fa-satellite text-2xl"></i>
+                  <p className="text-[10px]">Awaiting live research synchronization via Google Search Grounding...</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* A2A Simulation Container */}
+          <div className="bg-[#111] border border-white/5 p-6 rounded-2xl relative">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xs font-bold text-gray-300 uppercase tracking-widest flex items-center gap-2">
+                <i className="fa-solid fa-terminal text-emerald-500"></i>
+                <span>A2A Protocol Sandbox</span>
+              </h3>
+              <span className="text-[9px] text-emerald-500/60 font-mono tracking-tighter">ENVIRONMENT: DOCKER_A2A_ISO</span>
             </div>
             
             <div className="space-y-4">
@@ -195,125 +276,87 @@ const Dashboard: React.FC = () => {
                 <textarea 
                   value={a2aInstruction}
                   onChange={(e) => setA2aInstruction(e.target.value)}
-                  className="w-full bg-black/40 border border-white/5 rounded-lg p-4 text-xs text-gray-300 font-mono h-24 focus:border-emerald-500/40 outline-none"
-                  placeholder="Enter A2A Task Request Instruction..."
+                  className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-[11px] text-emerald-500/80 font-mono h-20 focus:border-emerald-500/40 outline-none transition-all placeholder:text-emerald-900"
+                  placeholder="Inject A2A Task Instruction..."
                 />
                 <button 
                   onClick={handleRunA2ASimulation}
                   disabled={isProcessingA2A}
-                  className="absolute bottom-4 right-4 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded text-[10px] font-bold transition-all disabled:opacity-50"
+                  className="absolute bottom-3 right-3 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all disabled:opacity-50 shadow-lg shadow-emerald-500/20"
                 >
-                  {isProcessingA2A ? 'EXECUTING...' : 'RUN PROTOCOL'}
+                  {isProcessingA2A ? 'PROCESS_A2A...' : 'EXECUTE_PAYLOAD'}
                 </button>
               </div>
 
               {a2aResponse && (
-                <div className="animate-in fade-in slide-in-from-top-4 duration-500 space-y-4">
-                  <div className="bg-black/80 rounded-lg p-4 border border-emerald-500/20">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className={`text-[10px] font-bold ${a2aResponse.status === 'success' ? 'text-emerald-400' : 'text-red-400'}`}>
-                        PROTOCOL {a2aResponse.status.toUpperCase()}
-                      </span>
-                      <span className="text-[8px] text-gray-600">A2A_ISO_2024_03_SECURE</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in zoom-in-95 duration-500">
+                  <div className="bg-black/80 rounded-xl p-4 border border-emerald-500/20 space-y-3">
+                    <div className="flex items-center justify-between border-b border-emerald-500/10 pb-2">
+                      <span className="text-[9px] font-bold text-emerald-400">A2A_JSON_PAYLOAD</span>
+                      <i className="fa-solid fa-check text-[8px] text-emerald-500"></i>
                     </div>
-                    <pre className="text-[10px] text-emerald-300 overflow-x-auto whitespace-pre-wrap font-mono">
+                    <pre className="text-[10px] text-emerald-500/90 overflow-x-auto font-mono leading-relaxed">
                       {JSON.stringify(a2aResponse.payload, null, 2)}
                     </pre>
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-[#0a0a0a] p-4 rounded-lg border border-white/5">
-                      <h4 className="text-[10px] text-gray-500 font-bold uppercase mb-2">Detailed Reasoning (Logs)</h4>
-                      <p className="text-[11px] text-gray-400 leading-relaxed italic">{a2aResponse.reasoning_log}</p>
+                  <div className="bg-[#0c0c0c] p-4 rounded-xl border border-white/5 space-y-4">
+                    <div>
+                      <h4 className="text-[9px] text-gray-500 font-bold uppercase mb-2 flex items-center gap-1">
+                        <i className="fa-solid fa-microscope text-violet-400"></i> RLHF Logic Trace
+                      </h4>
+                      <p className="text-[10px] text-gray-400 leading-relaxed font-light">{a2aResponse.reasoning_log}</p>
                     </div>
-                    <div className="bg-[#0a0a0a] p-4 rounded-lg border border-violet-500/20">
-                      <h4 className="text-[10px] text-violet-400 font-bold uppercase mb-2">RLHF Evaluation Loop</h4>
-                      <p className="text-[11px] text-gray-400 leading-relaxed">{a2aResponse.rlhf_critique || "Awaiting Human-in-the-loop feedback..."}</p>
+                    <div className="pt-3 border-t border-white/5">
+                      <h4 className="text-[9px] text-violet-400 font-bold uppercase mb-1">Feedback Critique</h4>
+                      <p className="text-[10px] text-gray-500 italic leading-snug">{a2aResponse.rlhf_critique || "Critique module pending..."}</p>
                     </div>
                   </div>
                 </div>
               )}
             </div>
           </div>
-
-          <QuantumGraph data={graphData} />
           
-          {/* Research Section */}
-          <div className="bg-[#111] border border-white/5 p-6 rounded-xl flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest flex items-center space-x-2">
-                 <i className="fa-brands fa-google text-blue-400"></i>
-                 <span>Green Standardization Intelligence</span>
-              </h3>
-            </div>
-            <form onSubmit={handleSearchStandards} className="flex space-x-2 mb-4">
-              <input 
-                type="text" 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-grow bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-xs focus:outline-none focus:border-emerald-500/50 transition-all text-gray-200"
-                placeholder="Synchronize with recently time data..."
-              />
-              <button disabled={isSearching} className="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-lg transition-all disabled:opacity-50">
-                <i className={`fa-solid ${isSearching ? 'fa-spinner fa-spin' : 'fa-magnifying-glass'}`}></i>
-              </button>
-            </form>
-            <div className="h-48 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-              {searchResults ? (
-                <div className="animate-in fade-in duration-700">
-                  <p className="text-xs text-gray-400 leading-relaxed mb-4">{searchResults.text}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {searchResults.sources.map((src, i) => (
-                      <a key={i} href={src.uri} target="_blank" className="text-[9px] bg-blue-500/10 text-blue-400 px-2 py-1 rounded border border-blue-500/20 hover:bg-blue-500/20">
-                        {src.title || 'Source'}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-full opacity-30 text-xs">Awaiting Research synchronization...</div>
-              )}
-            </div>
-          </div>
+          <QuantumGraph data={graphData} />
         </div>
 
-        {/* Right Panel: Proposals & AgentBeats Integration - Column 4 */}
-        <div className="space-y-6 lg:col-span-1">
-          <div className="bg-[#111] border border-white/5 p-6 rounded-xl shadow-lg relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-               <i className="fa-solid fa-brain text-5xl text-violet-500"></i>
-            </div>
-            <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-widest mb-4">Competition Proposal</h3>
+        {/* Right Section: Submissions - 3 Columns */}
+        <div className="lg:col-span-3 space-y-6">
+          <div className="bg-[#111] border border-white/5 p-6 rounded-2xl shadow-xl space-y-4">
+            <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-2">
+              <i className="fa-solid fa-paper-plane"></i> Submission Hub
+            </h3>
             <button 
               onClick={handleGenerateReport}
               disabled={isGenerating}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-lg font-bold text-xs transition-all shadow-lg disabled:opacity-50"
+              className="w-full bg-gradient-to-r from-emerald-600 to-violet-600 hover:from-emerald-500 hover:to-violet-500 text-white py-3 rounded-xl font-bold text-[11px] transition-all shadow-xl disabled:opacity-50 uppercase tracking-widest flex items-center justify-center gap-2"
             >
-              {isGenerating ? 'THINKING DEEPLY...' : 'GENERATE SUBMISSION'}
+              {isGenerating ? <><i className="fa-solid fa-circle-notch fa-spin"></i> Synthesis...</> : 'Propose to Beats'}
             </button>
-            <div className="mt-4 pt-4 border-t border-white/5">
-               <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
-                  <span>Thinking Budget</span>
-                  <span className="text-violet-400">32k Tokens</span>
+            <div className="bg-black/30 rounded-lg p-4 space-y-3">
+               <div className="flex justify-between text-[10px] border-b border-white/5 pb-2">
+                  <span className="text-gray-500">Thinking Mode</span>
+                  <span className="text-violet-400 font-mono">ACTIVE (32k)</span>
                </div>
-               <div className="flex items-center justify-between text-[10px] text-gray-500">
-                  <span>Compliance</span>
-                  <span className="text-emerald-400">A2A v2.1</span>
+               <div className="flex justify-between text-[10px]">
+                  <span className="text-gray-500">Standard</span>
+                  <span className="text-emerald-400 font-mono">A2A_COMPLIANT</span>
                </div>
             </div>
           </div>
 
-          <div className="bg-[#111] border border-white/5 p-6 rounded-xl h-[530px] flex flex-col shadow-inner">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Submission Artifact</h3>
+          <div className="bg-[#111] border border-white/5 p-6 rounded-2xl h-[570px] flex flex-col shadow-inner">
+            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <i className="fa-solid fa-scroll text-amber-500"></i> Reasoning Artifact
+            </h3>
             <div className="flex-grow overflow-y-auto text-[11px] text-gray-400 leading-relaxed font-light custom-scrollbar">
               {report ? (
-                <div className="whitespace-pre-wrap mono bg-black/20 p-3 rounded border border-white/5 animate-in fade-in duration-700">
+                <div className="whitespace-pre-wrap mono bg-black/40 p-4 rounded-xl border border-white/10 animate-in fade-in duration-700 shadow-inner leading-relaxed">
                   {report}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center space-y-4 text-gray-600 opacity-20">
-                  <i className="fa-solid fa-microchip text-4xl"></i>
-                  <p className="italic px-4">Generate reasoning artifact for evaluation loop.</p>
+                <div className="flex flex-col items-center justify-center h-full text-center space-y-4 opacity-10">
+                  <i className="fa-solid fa-robot text-5xl"></i>
+                  <p className="text-[10px] px-4 font-bold tracking-widest uppercase">Awaiting High-Reasoning Generation</p>
                 </div>
               )}
             </div>
@@ -331,9 +374,15 @@ const MetricItem: React.FC<{ label: string; val: string; color: 'emerald' | 'vio
     blue: 'text-blue-400',
     amber: 'text-amber-400'
   };
+  const bgMap = {
+    emerald: 'bg-emerald-400/5 border-emerald-400/10',
+    violet: 'bg-violet-400/5 border-violet-400/10',
+    blue: 'bg-blue-400/5 border-blue-400/10',
+    amber: 'bg-amber-400/5 border-amber-400/10'
+  };
   return (
-    <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5 transition-all hover:border-white/10">
-      <span className="text-[10px] text-gray-500 uppercase font-bold">{label}</span>
+    <div className={`flex items-center justify-between p-3 rounded-xl border transition-all hover:scale-[1.02] ${bgMap[color]}`}>
+      <span className="text-[10px] text-gray-500 uppercase font-bold tracking-tighter">{label}</span>
       <span className={`text-sm font-mono font-bold ${colorMap[color]}`}>{val}</span>
     </div>
   );
