@@ -21,6 +21,11 @@ const Dashboard: React.FC = () => {
   const [a2aResponse, setA2aResponse] = useState<A2AResponse | null>(null);
   const [a2aInstruction, setA2aInstruction] = useState('Evaluate multi-modal entropy reduction in the quantum-limit pipeline.');
   
+  // Feedback Loop States
+  const [userFeedback, setUserFeedback] = useState('');
+  const [feedbackLogs, setFeedbackLogs] = useState<{ id: string; text: string; timestamp: string; taskId: string }[]>([]);
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+
   const [analysisResult, setAnalysisResult] = useState<{
     anomalies: string[];
     correctionPath: string;
@@ -71,6 +76,7 @@ const Dashboard: React.FC = () => {
 
   const handleRunA2ASimulation = async () => {
     setIsProcessingA2A(true);
+    setA2aResponse(null); // Clear previous
     const request: A2ARequest = {
       task_id: `BEATS-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
       instruction: a2aInstruction,
@@ -84,6 +90,25 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const handleFeedbackSubmit = () => {
+    if (!userFeedback.trim() || !a2aResponse) return;
+    setIsSubmittingFeedback(true);
+    
+    // Simulate logging feedback
+    const newLog = {
+      id: Math.random().toString(36).substr(2, 9),
+      text: userFeedback,
+      timestamp: new Date().toLocaleTimeString(),
+      taskId: a2aResponse.payload.metadata.timestamp // Using timestamp as proxy for task unique identifier in mock
+    };
+
+    setTimeout(() => {
+      setFeedbackLogs(prev => [newLog, ...prev]);
+      setUserFeedback('');
+      setIsSubmittingFeedback(false);
+    }, 600);
+  };
+
   const handleAnalyzeProvenance = async () => {
     setIsAnalyzing(true);
     const mockLogs = `
@@ -91,6 +116,8 @@ const Dashboard: React.FC = () => {
       [PROVENANCE] TRACE: node_a1 -> node_q1 -> node_e1
       [SIGNAL] COHERENCE_LEVEL: 0.941
       [ERROR] SYNDROME_DETECTED: PHASE_FLIP_RECURSION_002
+      [STATE] ENTROPY_VAL: 0.042
+      [STATE] QEC_OVERHEAD: 12%
     `;
     try {
       const result = await analyzeQuantumProvenance(mockLogs);
@@ -192,6 +219,31 @@ const Dashboard: React.FC = () => {
             <MetricItem label="Provenance" val={`${selectedAgent.provenanceClarity}%`} color="blue" />
             <MetricItem label="Energy/Token" val={`${selectedAgent.energyPerToken}μJ`} color="amber" />
           </div>
+          
+          {/* Feedback History Log */}
+          <div className="bg-[#111] border border-white/5 p-6 rounded-2xl h-[280px] flex flex-col">
+            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <i className="fa-solid fa-clock-rotate-left text-amber-500"></i> Research Feedback Log
+            </h3>
+            <div className="flex-grow overflow-y-auto space-y-3 pr-1 custom-scrollbar">
+              {feedbackLogs.length > 0 ? (
+                feedbackLogs.map((log) => (
+                  <div key={log.id} className="bg-white/5 p-2.5 rounded-lg border border-white/5 text-[10px]">
+                    <div className="flex justify-between mb-1">
+                      <span className="text-amber-500/80 font-bold uppercase tracking-tighter">RLHF REFINEMENT</span>
+                      <span className="text-gray-600 font-mono">{log.timestamp}</span>
+                    </div>
+                    <p className="text-gray-400 italic line-clamp-3">"{log.text}"</p>
+                  </div>
+                ))
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-center opacity-20 px-4">
+                  <i className="fa-solid fa-inbox text-2xl mb-2"></i>
+                  <p className="text-[9px] uppercase font-bold tracking-widest leading-relaxed">Awaiting Human-In-The-Loop Data</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Center Section: Search & A2A Simulation - 6 Columns */}
@@ -261,7 +313,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* A2A Simulation Container */}
+          {/* A2A Simulation Container with Feedback Loop */}
           <div className="bg-[#111] border border-white/5 p-6 rounded-2xl relative">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xs font-bold text-gray-300 uppercase tracking-widest flex items-center gap-2">
@@ -289,26 +341,58 @@ const Dashboard: React.FC = () => {
               </div>
 
               {a2aResponse && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in zoom-in-95 duration-500">
-                  <div className="bg-black/80 rounded-xl p-4 border border-emerald-500/20 space-y-3">
-                    <div className="flex items-center justify-between border-b border-emerald-500/10 pb-2">
-                      <span className="text-[9px] font-bold text-emerald-400">A2A_JSON_PAYLOAD</span>
-                      <i className="fa-solid fa-check text-[8px] text-emerald-500"></i>
+                <div className="space-y-4 animate-in zoom-in-95 duration-500">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-black/80 rounded-xl p-4 border border-emerald-500/20 space-y-3">
+                      <div className="flex items-center justify-between border-b border-emerald-500/10 pb-2">
+                        <span className="text-[9px] font-bold text-emerald-400">A2A_JSON_PAYLOAD</span>
+                        <i className="fa-solid fa-check text-[8px] text-emerald-500"></i>
+                      </div>
+                      <pre className="text-[10px] text-emerald-500/90 overflow-x-auto font-mono leading-relaxed">
+                        {JSON.stringify(a2aResponse.payload, null, 2)}
+                      </pre>
                     </div>
-                    <pre className="text-[10px] text-emerald-500/90 overflow-x-auto font-mono leading-relaxed">
-                      {JSON.stringify(a2aResponse.payload, null, 2)}
-                    </pre>
+                    <div className="bg-[#0c0c0c] p-4 rounded-xl border border-white/5 space-y-4">
+                      <div>
+                        <h4 className="text-[9px] text-gray-500 font-bold uppercase mb-2 flex items-center gap-1">
+                          <i className="fa-solid fa-microscope text-violet-400"></i> RLHF Logic Trace
+                        </h4>
+                        <p className="text-[10px] text-gray-400 leading-relaxed font-light">{a2aResponse.reasoning_log}</p>
+                      </div>
+                      <div className="pt-3 border-t border-white/5">
+                        <h4 className="text-[9px] text-violet-400 font-bold uppercase mb-1">Self-Critique Modality</h4>
+                        <p className="text-[10px] text-gray-500 italic leading-snug">{a2aResponse.rlhf_critique || "Critique module pending..."}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="bg-[#0c0c0c] p-4 rounded-xl border border-white/5 space-y-4">
-                    <div>
-                      <h4 className="text-[9px] text-gray-500 font-bold uppercase mb-2 flex items-center gap-1">
-                        <i className="fa-solid fa-microscope text-violet-400"></i> RLHF Logic Trace
-                      </h4>
-                      <p className="text-[10px] text-gray-400 leading-relaxed font-light">{a2aResponse.reasoning_log}</p>
+
+                  {/* Integrated Feedback Loop Mechanism */}
+                  <div className="bg-violet-500/5 border border-violet-500/20 rounded-xl p-5 animate-in slide-in-from-top-2">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-8 h-8 rounded-full bg-violet-500/20 flex items-center justify-center text-violet-400">
+                        <i className="fa-solid fa-user-gear text-sm"></i>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-violet-300">Human-In-The-Loop Feedback</h4>
+                        <p className="text-[10px] text-violet-500/70">Refine agent reasoning based on RLHF Critique results</p>
+                      </div>
                     </div>
-                    <div className="pt-3 border-t border-white/5">
-                      <h4 className="text-[9px] text-violet-400 font-bold uppercase mb-1">Feedback Critique</h4>
-                      <p className="text-[10px] text-gray-500 italic leading-snug">{a2aResponse.rlhf_critique || "Critique module pending..."}</p>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text"
+                        value={userFeedback}
+                        onChange={(e) => setUserFeedback(e.target.value)}
+                        placeholder="Critique this result (e.g., 'Increase energy efficiency focus')"
+                        className="flex-grow bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-xs focus:ring-1 focus:ring-violet-500/40 outline-none transition-all"
+                      />
+                      <button 
+                        onClick={handleFeedbackSubmit}
+                        disabled={isSubmittingFeedback || !userFeedback.trim()}
+                        className="bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-lg text-[10px] font-bold transition-all disabled:opacity-50 flex items-center gap-2"
+                      >
+                        {isSubmittingFeedback ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}
+                        LOG FEEDBACK
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -316,7 +400,54 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
           
-          <QuantumGraph data={graphData} />
+          {/* Quantum Diagnostics Module */}
+          <div className="space-y-4">
+            <div className="relative">
+              <QuantumGraph data={graphData} />
+              <button 
+                onClick={handleAnalyzeProvenance}
+                disabled={isAnalyzing}
+                className="absolute top-4 right-4 bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-lg text-[10px] font-bold transition-all disabled:opacity-50 shadow-lg shadow-violet-500/30 flex items-center gap-2"
+              >
+                {isAnalyzing ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-stethoscope"></i>}
+                RUN DIAGNOSTICS
+              </button>
+            </div>
+
+            {analysisResult && (
+              <div className="bg-[#111] border border-violet-500/20 p-6 rounded-2xl animate-in slide-in-from-bottom-4 duration-700">
+                <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
+                  <h3 className="text-xs font-bold text-violet-400 uppercase tracking-widest flex items-center gap-2">
+                    <i className="fa-solid fa-gauge-high"></i>
+                    <span>Quantum State Analysis</span>
+                  </h3>
+                  <div className="text-[10px] font-mono text-gray-500">CONFIDENCE: <span className="text-emerald-400">{Math.round(analysisResult.confidenceScore * 100)}%</span></div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <p className="text-[9px] font-bold text-red-400 uppercase tracking-widest">Detected Anomalies</p>
+                    <div className="space-y-2">
+                      {analysisResult.anomalies.map((anomaly, idx) => (
+                        <div key={idx} className="bg-red-500/5 border border-red-500/10 p-2 rounded flex items-start gap-2 text-[10px] text-gray-400">
+                          <i className="fa-solid fa-triangle-exclamation text-red-500 mt-0.5"></i>
+                          <span>{anomaly}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest">Correction Path</p>
+                    <div className="bg-emerald-500/5 border border-emerald-500/10 p-4 rounded-lg">
+                      <p className="text-[11px] text-gray-300 leading-relaxed font-light italic">
+                        {analysisResult.correctionPath}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right Section: Submissions - 3 Columns */}
