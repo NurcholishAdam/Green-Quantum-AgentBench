@@ -1,10 +1,10 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { AgentBenchmark } from "../types";
+import { AgentBenchmark, A2ARequest, A2AResponse } from "../types";
+
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
 
 export const generateAgentBeatsProposal = async (agent: AgentBenchmark) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-  
   const prompt = `
     Generate an extremely detailed, high-reasoning formal benchmarking proposal for the 'AgentBeats' framework.
     Target Agent: ${agent.name} (v${agent.version})
@@ -38,14 +38,61 @@ export const generateAgentBeatsProposal = async (agent: AgentBenchmark) => {
   }
 };
 
+export const processA2ATask = async (request: A2ARequest, agent: AgentBenchmark): Promise<A2AResponse> => {
+  const prompt = `
+    ACT AS AN A2A COMPLIANT AGENT.
+    Process the following task request:
+    Task ID: ${request.task_id}
+    Instruction: ${request.instruction}
+    Constraints: ${request.constraints.join(', ')}
+    Agent Capability Profile: ${agent.name} (Efficiency: ${agent.greenScore}%, QEC: ${agent.quantumErrorCorrection}%)
+
+    Return a result in strict JSON format according to A2A standards:
+    {
+      "status": "success" | "failure",
+      "payload": {
+        "result": "The final answer to the task",
+        "metrics": {
+          "energy_consumed_uj": number,
+          "quantum_fidelity": number,
+          "token_count": number
+        },
+        "metadata": { "timestamp": "ISO-8601", "agent_id": "${agent.id}" }
+      },
+      "reasoning_log": "Internal step-by-step logic",
+      "rlhf_critique": "Self-evaluation against RLHF principles for sustainability and precision"
+    }
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-pro-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        thinkingConfig: { thinkingBudget: 24000 }
+      }
+    });
+    return JSON.parse(response.text);
+  } catch (error) {
+    return {
+      status: 'failure',
+      payload: {
+        result: "Internal Protocol Error",
+        metrics: { energy_consumed_uj: 0, quantum_fidelity: 0, token_count: 0 },
+        metadata: { timestamp: new Date().toISOString(), agent_id: agent.id }
+      },
+      reasoning_log: "The evaluation logic handled a failure case gracefully. Error: " + (error as Error).message
+    };
+  }
+};
+
 export interface SearchResult {
   text: string;
   sources: { uri: string; title?: string }[];
 }
 
 export const searchGreenStandards = async (query: string): Promise<SearchResult> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-  
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
@@ -75,8 +122,6 @@ export const searchGreenStandards = async (query: string): Promise<SearchResult>
 };
 
 export const analyzeQuantumProvenance = async (logs: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-  
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: `Analyze these agent execution logs for quantum provenance and potential error loops: \n\n${logs}`,

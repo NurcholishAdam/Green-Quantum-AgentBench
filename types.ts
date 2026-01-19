@@ -29,6 +29,30 @@ export interface QuantumGraphData {
   links: GraphLink[];
 }
 
+export interface A2ARequest {
+  task_id: string;
+  instruction: string;
+  constraints: string[];
+}
+
+export interface A2AResponse {
+  status: 'success' | 'failure';
+  payload: {
+    result: string;
+    metrics: {
+      energy_consumed_uj: number;
+      quantum_fidelity: number;
+      token_count: number;
+    };
+    metadata: {
+      timestamp: string;
+      agent_id: string;
+    };
+  };
+  reasoning_log: string;
+  rlhf_critique?: string;
+}
+
 export enum BenchmarkModule {
   GREEN_METRICS = 'GREEN_METRICS',
   QUANTUM_ERR_CORRECTION = 'QUANTUM_ERR_CORRECTION',
