@@ -43,6 +43,9 @@ export interface A2AResponse {
       energy_consumed_uj: number;
       quantum_fidelity: number;
       token_count: number;
+      carbon_intensity_g?: number;
+      latency_ms?: number;
+      accuracy_purity?: number;
     };
     metadata: {
       timestamp: string;
@@ -57,5 +60,7 @@ export enum BenchmarkModule {
   GREEN_METRICS = 'GREEN_METRICS',
   QUANTUM_ERR_CORRECTION = 'QUANTUM_ERR_CORRECTION',
   QUANTUM_PROVENANCE = 'QUANTUM_PROVENANCE',
-  MULTILINGUAL_BENCH = 'MULTILINGUAL_BENCH'
+  MULTILINGUAL_BENCH = 'MULTILINGUAL_BENCH',
+  QL_GRAPH_PROV = 'QL_GRAPH_PROV',
+  DATASET_EXPLORER = 'DATASET_EXPLORER'
 }

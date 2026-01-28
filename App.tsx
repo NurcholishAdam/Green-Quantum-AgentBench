@@ -40,11 +40,11 @@ const App: React.FC = () => {
             title="Quantum Simulation Modules" 
             icon="fa-microchip" 
             color="violet" 
-            description="Evaluating the Accuracy-Latency trade-offs in high-fidelity gate benchmarking for the 2025 AgentBeats ecosystem."
+            description="Real-time benchmarking of quantum gate fidelity through the lens of AgentBeats Robust Scoring. We evaluate gate accuracy against cryogenic energy overhead to maintain a sustainable Pareto frontier for fault-tolerant agent kernels."
             onAnalyze={handleDeepAnalysis}
             initialInsights={[
               { label: "Gate Accuracy", value: "99.991%", subtext: "Standard CZ Fidelity", icon: "fa-crosshairs", progress: 99 },
-              { label: "Control Latency", value: "42ms", subtext: "Real-time sync overhead", icon: "fa-stopwatch", progress: 85 },
+              { label: "Cycle Latency", value: "42ms", subtext: "Real-time sync overhead", icon: "fa-stopwatch", progress: 85 },
               { label: "Energy Flux", value: "0.15μJ", subtext: "Cryogenic overhead cost", icon: "fa-snowflake", progress: 78 }
             ]}
           />
@@ -55,11 +55,11 @@ const App: React.FC = () => {
             title="Green Energy Metrics" 
             icon="fa-leaf" 
             color="emerald" 
-            description="Multi-objective analysis of micro-joule per token efficiency against carbon-offset intensity (PUE 1.05 targets)."
+            description="Our primary sustainability vector for A2A Compliance. This module tracks micro-joule per token efficiency and carbon footprint intensity (gCO2eq). By enforcing independent evaluation nodes, we ensure verifiable green benchmarks for the 2025 competition."
             onAnalyze={handleDeepAnalysis}
             initialInsights={[
-              { label: "Energy Efficiency", value: "0.12μJ/T", subtext: "SOTA 2025 B200 baseline", icon: "fa-bolt", progress: 96 },
-              { label: "Carbon Footprint", value: "0.08g/hr", subtext: "Clean Grid Purity", icon: "fa-cloud-sun", progress: 82 },
+              { label: "Energy Intensity", value: "0.12μJ/T", subtext: "B200 cluster baseline", icon: "fa-bolt", progress: 96 },
+              { label: "Carbon Trace", value: "0.08g/hr", subtext: "Clean Grid Purity", icon: "fa-cloud-sun", progress: 82 },
               { label: "Objective Balance", value: "0.94", subtext: "Pareto optimal score", icon: "fa-scale-balanced", progress: 94 }
             ]}
           />
@@ -70,7 +70,7 @@ const App: React.FC = () => {
             title="Multilingual Benchmarks" 
             icon="fa-language" 
             color="blue" 
-            description="Benchmarking zero-shot semantic accuracy across 124+ ISO languages with a focus on token-latency symmetry."
+            description="Evaluation of cross-lingual reasoning independence. We benchmark zero-shot semantic accuracy across 124+ ISO languages, analyzing how token-latency symmetry affects the feedback loop between global research nodes."
             onAnalyze={handleDeepAnalysis}
             initialInsights={[
               { label: "Semantic Accuracy", value: "48.2", subtext: "Flores-200 Average", icon: "fa-spell-check", progress: 85 },
@@ -85,7 +85,7 @@ const App: React.FC = () => {
             title="QL-Graph Provenance" 
             icon="fa-network-wired" 
             color="blue" 
-            description="Synchronized tracing of decision lineage, optimizing for provenance transparency versus computational energy overhead."
+            description="Visualizing the lineage of agent decisions via high-fidelity, synchronized nodes. This module ensures Data Provenance and Independence by tracing the causal decision path from quantum-limit seeds to final agent actions."
             onAnalyze={handleDeepAnalysis}
             initialInsights={[
               { label: "Lineage Clarity", value: "99.9%", subtext: "Data origin fidelity", icon: "fa-fingerprint", progress: 100 },
@@ -100,7 +100,7 @@ const App: React.FC = () => {
             title="Quantum Error Correction" 
             icon="fa-shield-halved" 
             color="red" 
-            description="Monitoring logical error resilience (d=7) against hardware resource consumption and physical cycle latency."
+            description="Monitoring Surface Code resilience (d=7) for fault-tolerant agentic reasoning. We implement a robust scoring feedback loop to predict failure modes, ensuring agent independence even under high decoherence environments."
             onAnalyze={handleDeepAnalysis}
             initialInsights={[
               { label: "Logical Fidelity", value: "99.999%", subtext: "d=7 Distance Surface", icon: "fa-shield-heart", progress: 99 },
@@ -115,7 +115,7 @@ const App: React.FC = () => {
             title="Dataset Explorer" 
             icon="fa-database" 
             color="amber" 
-            description="Exploring the 2025 AgentBeats training corpus, validating accuracy metrics alongside source carbon-tracing."
+            description="Dynamic exploration of the AgentBeats training corpus. This module validates data purity against the A2A handshake protocol, providing real-time global index upgrades and verifiable source carbon-tracing for all dataset contributors."
             onAnalyze={handleDeepAnalysis}
             initialInsights={[
               { label: "Corpus Purity", value: "99.2%", subtext: "A2A governance check", icon: "fa-check-double", progress: 100 },
@@ -209,9 +209,9 @@ const App: React.FC = () => {
                       <i className="fa-solid fa-feather-pointed absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-emerald-500 animate-pulse text-4xl"></i>
                     </div>
                     <div className="text-center space-y-4">
-                      <h4 className="text-3xl font-black text-white tracking-tighter uppercase italic">Synthesizing Formal Report...</h4>
+                      <h4 className="text-3xl font-black text-white tracking-tighter uppercase italic">Synthesizing Industrial White Paper...</h4>
                       <p className="text-sm text-gray-500 max-w-sm mx-auto font-light leading-relaxed">
-                        "Evaluating 4-vector optimization: Accuracy, Energy, Carbon, Latency. High-reasoning protocol active."
+                        "Evaluating AgentBeats vectors: A2A Compliance, Sustainability, and Independent Scoring. High-reasoning kernel active."
                       </p>
                     </div>
                   </div>
@@ -219,7 +219,7 @@ const App: React.FC = () => {
                   <div className="max-w-none text-gray-300 leading-relaxed font-light font-serif">
                     <div className="bg-emerald-500/5 p-8 rounded-[2rem] border border-emerald-500/10 mb-12 italic text-sm text-emerald-400 flex items-start gap-4">
                       <i className="fa-solid fa-quote-left text-2xl opacity-40"></i>
-                      <span>This document provides a quantitative evaluation of the module's performance on the Pareto frontier, integrating real-time 2025 research standards from established academic repositories.</span>
+                      <span>This document provides a quantitative evaluation of the module's performance on the Pareto frontier, integrating real-time 2025 research standards and AgentBeats independence protocols.</span>
                     </div>
                     <div className="prose prose-invert prose-emerald max-w-none prose-lg">
                       {analysisContent}
@@ -312,7 +312,7 @@ const ModuleViewer: React.FC<{
         </div>
         <div className="text-center md:text-left space-y-6 max-w-3xl">
           <div className="flex items-center justify-center md:justify-start gap-5">
-             <span className="px-5 py-2 bg-white/5 border border-white/10 rounded-full text-[11px] font-black text-gray-500 uppercase tracking-[0.3em]">Multi-Objective Node</span>
+             <span className="px-5 py-2 bg-white/5 border border-white/10 rounded-full text-[11px] font-black text-gray-500 uppercase tracking-[0.3em]">AgentBeats Objective Node</span>
              <div className="flex gap-1">
                {[1, 2, 3].map(i => <div key={i} className="w-1.5 h-1.5 rounded-full bg-emerald-500/40"></div>)}
              </div>
@@ -334,8 +334,8 @@ const ModuleViewer: React.FC<{
                     <i className="fa-solid fa-microscope text-2xl"></i>
                  </div>
                  <div>
-                    <h4 className="font-black text-blue-400 uppercase tracking-[0.2em] text-xs">Research Intelligence Synchronized</h4>
-                    <p className="text-[10px] text-gray-600 font-mono">NODE_STATUS: UPLINK_ESTABLISHED</p>
+                    <h4 className="font-black text-blue-400 uppercase tracking-[0.2em] text-xs">A2A Industry Standards Grounded</h4>
+                    <p className="text-[10px] text-gray-600 font-mono">NODE_STATUS: RESEARCH_ACTIVE</p>
                  </div>
               </div>
               <button onClick={() => setSyncResult(null)} className="text-[10px] font-black text-gray-600 hover:text-white uppercase tracking-widest transition-all hover:translate-x-1">Dismiss Intelligence <i className="fa-solid fa-chevron-right ml-2"></i></button>
@@ -347,14 +347,14 @@ const ModuleViewer: React.FC<{
                  </p>
               </div>
               <div className="space-y-6">
-                 <p className="text-[11px] font-black text-gray-500 uppercase tracking-widest mb-4">Industrial Standards Found (2025)</p>
+                 <p className="text-[11px] font-black text-gray-500 uppercase tracking-widest mb-4">Verifiable Academic Repositories (2025)</p>
                  <div className="grid grid-cols-1 gap-4">
                    {syncResult.sources.slice(0, 3).map((s, idx) => (
                      <a key={idx} href={s.uri} target="_blank" className="flex items-center gap-6 p-5 bg-white/5 border border-white/10 rounded-[1.5rem] hover:bg-white/10 hover:border-blue-500/30 transition-all group/link shadow-xl">
                         <div className="w-10 h-10 rounded-2xl bg-blue-500/5 flex items-center justify-center text-blue-500 group-hover/link:scale-110 transition-transform">
                            <i className="fa-solid fa-link"></i>
                         </div>
-                        <span className="text-xs text-gray-400 font-bold tracking-tight truncate">{s.title || 'Academic Research Node'}</span>
+                        <span className="text-xs text-gray-400 font-bold tracking-tight truncate">{s.title || 'Independent Benchmark Node'}</span>
                      </a>
                    ))}
                  </div>
@@ -375,7 +375,7 @@ const ModuleViewer: React.FC<{
                 <i className={`fa-solid ${insight.icon} text-3xl`}></i>
               </div>
               <div className="flex flex-col items-end">
-                <span className="text-[10px] font-black text-gray-700 uppercase tracking-widest">UNIT_VECTOR</span>
+                <span className="text-[10px] font-black text-gray-700 uppercase tracking-widest">PARETO_VECTOR</span>
                 <span className="text-sm font-black text-white">[{i+1}]</span>
               </div>
             </div>
@@ -388,7 +388,7 @@ const ModuleViewer: React.FC<{
 
             <div className="space-y-4">
               <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-gray-700">
-                <span>Objective Reliability</span>
+                <span>Robust Scoring Alignment</span>
                 <span className="text-white">{Math.round(insight.progress)}%</span>
               </div>
               <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden p-1 border border-white/10">
@@ -413,7 +413,7 @@ const ModuleViewer: React.FC<{
           <div className="w-10 h-10 rounded-2xl bg-violet-500/10 flex items-center justify-center text-violet-500 group-hover:bg-violet-500 group-hover:text-white transition-all shadow-lg">
             <i className="fa-solid fa-file-signature text-xl"></i>
           </div>
-          Generate White Paper
+          Synthesize Technical Paper
         </button>
         <button 
           onClick={handleRefresh}
@@ -424,7 +424,7 @@ const ModuleViewer: React.FC<{
           <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center shadow-inner">
             <i className={`fa-solid ${isRefreshing ? 'fa-sync fa-spin' : 'fa-satellite'} text-xl`}></i>
           </div>
-          {isRefreshing ? 'Audit in Progress...' : 'Trigger Industrial Sync'}
+          {isRefreshing ? 'Gounding Frontier...' : 'Update Pareto Nodes'}
         </button>
       </div>
 
@@ -432,19 +432,19 @@ const ModuleViewer: React.FC<{
       <div className="flex flex-wrap items-center justify-center gap-12 pt-16 border-t border-white/5 opacity-40 grayscale hover:grayscale-0 transition-all">
          <div className="flex items-center gap-3 text-[11px] font-mono text-gray-500">
             <i className="fa-solid fa-shield-halved text-emerald-500 text-lg"></i>
-            SECURE_A2A_COMPLIANCE_V2.1
+            A2A_COMPLIANCE_V2.1
          </div>
          <div className="flex items-center gap-3 text-[11px] font-mono text-gray-600">
-            <i className="fa-solid fa-server"></i>
-            RESEARCH_NODE_GA-X7
+            <i className="fa-solid fa-user-check"></i>
+            INDEPENDENT_EVAL_NODE
          </div>
          <div className="flex items-center gap-3 text-[11px] font-mono text-gray-500">
             <i className="fa-solid fa-clock-rotate-left"></i>
-            HISTORICAL_ALIGNED: 2025_Q1
+            ROBUST_SCORING_V25
          </div>
          <div className="flex items-center gap-3 text-[11px] font-mono text-gray-500">
-            <i className="fa-solid fa-leaf text-emerald-400"></i>
-            PUE_1.05_STANDARD
+            <i className="fa-solid fa-rotate"></i>
+            FEEDBACK_LOOP_ACTIVE
          </div>
       </div>
     </div>
