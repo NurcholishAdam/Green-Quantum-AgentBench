@@ -1,8 +1,18 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Dashboard from './components/Dashboard';
+import QuantumGraph from './components/QuantumGraph';
+import GreenParetoChart from './components/GreenParetoChart';
+import MultilingualMosaic from './components/MultilingualMosaic';
 import { MOCK_AGENTS } from './constants';
-import { getDeepModuleAnalysis, syncModuleWithRealWorld, SearchResult } from './services/geminiService';
+import { 
+  getDeepModuleAnalysis, 
+  syncModuleWithRealWorld, 
+  SearchResult, 
+  getQuantumTelemetry, 
+  getGreenTelemetry,
+  getMultilingualTelemetry
+} from './services/geminiService';
 
 type TabType = 'dashboard' | 'quantum' | 'green' | 'multilingual' | 'qlgraph' | 'error' | 'dataset';
 
@@ -12,6 +22,13 @@ interface Insight {
   subtext: string;
   icon: string;
   progress: number;
+}
+
+interface TelemetryLog {
+  timestamp: string;
+  label: string;
+  oldValue: string;
+  newValue: string;
 }
 
 const App: React.FC = () => {
@@ -40,11 +57,13 @@ const App: React.FC = () => {
             title="Quantum Simulation Modules" 
             icon="fa-microchip" 
             color="violet" 
-            description="Real-time benchmarking of quantum gate fidelity through the lens of AgentBeats Robust Scoring. We evaluate gate accuracy against cryogenic energy overhead to maintain a sustainable Pareto frontier for fault-tolerant agent kernels."
+            description="Real-time benchmarking of quantum gate fidelity through the lens of AgentBeats Robust Scoring. We evaluate gate accuracy against cryogenic energy overhead to maintain a sustainable Pareto frontier."
             onAnalyze={handleDeepAnalysis}
+            showTelemetryButton={true}
+            telemetryType="quantum"
             initialInsights={[
               { label: "Gate Accuracy", value: "99.991%", subtext: "Standard CZ Fidelity", icon: "fa-crosshairs", progress: 99 },
-              { label: "Cycle Latency", value: "42ms", subtext: "Real-time sync overhead", icon: "fa-stopwatch", progress: 85 },
+              { label: "Coherence Stability", value: "88.4%", subtext: "Upgraded Reasoning Kernel", icon: "fa-wave-square", progress: 88 },
               { label: "Energy Flux", value: "0.15μJ", subtext: "Cryogenic overhead cost", icon: "fa-snowflake", progress: 78 }
             ]}
           />
@@ -55,8 +74,10 @@ const App: React.FC = () => {
             title="Green Energy Metrics" 
             icon="fa-leaf" 
             color="emerald" 
-            description="Our primary sustainability vector for A2A Compliance. This module tracks micro-joule per token efficiency and carbon footprint intensity (gCO2eq). By enforcing independent evaluation nodes, we ensure verifiable green benchmarks for the 2025 competition."
+            description="Our primary sustainability vector for A2A Compliance. This module tracks micro-joule per token efficiency and carbon footprint intensity (gCO2eq). By enforcing independent evaluation nodes, we ensure verifiable green benchmarks."
             onAnalyze={handleDeepAnalysis}
+            showTelemetryButton={true}
+            telemetryType="green"
             initialInsights={[
               { label: "Energy Intensity", value: "0.12μJ/T", subtext: "B200 cluster baseline", icon: "fa-bolt", progress: 96 },
               { label: "Carbon Trace", value: "0.08g/hr", subtext: "Clean Grid Purity", icon: "fa-cloud-sun", progress: 82 },
@@ -70,12 +91,14 @@ const App: React.FC = () => {
             title="Multilingual Benchmarks" 
             icon="fa-language" 
             color="blue" 
-            description="Evaluation of cross-lingual reasoning independence. We benchmark zero-shot semantic accuracy across 124+ ISO languages, analyzing how token-latency symmetry affects the feedback loop between global research nodes."
+            description="Evaluation of cross-lingual reasoning independence. We benchmark zero-shot semantic accuracy across 124+ ISO languages, analyzing how token-latency symmetry affects the global research nodes."
             onAnalyze={handleDeepAnalysis}
+            showTelemetryButton={true}
+            telemetryType="multilingual"
             initialInsights={[
               { label: "Semantic Accuracy", value: "48.2", subtext: "Flores-200 Average", icon: "fa-spell-check", progress: 85 },
               { label: "Inference Latency", value: "110ms", subtext: "Cross-script mean", icon: "fa-clock", progress: 70 },
-              { label: "Resource Ratio", value: "1:4.2", subtext: "High vs Low resource", icon: "fa-chart-simple", progress: 90 }
+              { label: "Low-Resource Stability", value: "0.64", subtext: "Stability coefficient", icon: "fa-chart-simple", progress: 64 }
             ]}
           />
         );
@@ -85,7 +108,7 @@ const App: React.FC = () => {
             title="QL-Graph Provenance" 
             icon="fa-network-wired" 
             color="blue" 
-            description="Visualizing the lineage of agent decisions via high-fidelity, synchronized nodes. This module ensures Data Provenance and Independence by tracing the causal decision path from quantum-limit seeds to final agent actions."
+            description="Visualizing the lineage of agent decisions via high-fidelity, synchronized nodes. This module ensures Data Provenance and Independence by tracing the causal decision path."
             onAnalyze={handleDeepAnalysis}
             initialInsights={[
               { label: "Lineage Clarity", value: "99.9%", subtext: "Data origin fidelity", icon: "fa-fingerprint", progress: 100 },
@@ -100,7 +123,7 @@ const App: React.FC = () => {
             title="Quantum Error Correction" 
             icon="fa-shield-halved" 
             color="red" 
-            description="Monitoring Surface Code resilience (d=7) for fault-tolerant agentic reasoning. We implement a robust scoring feedback loop to predict failure modes, ensuring agent independence even under high decoherence environments."
+            description="Monitoring Surface Code resilience (d=7) for fault-tolerant agentic reasoning. We implement a robust scoring feedback loop to predict failure modes."
             onAnalyze={handleDeepAnalysis}
             initialInsights={[
               { label: "Logical Fidelity", value: "99.999%", subtext: "d=7 Distance Surface", icon: "fa-shield-heart", progress: 99 },
@@ -115,7 +138,7 @@ const App: React.FC = () => {
             title="Dataset Explorer" 
             icon="fa-database" 
             color="amber" 
-            description="Dynamic exploration of the AgentBeats training corpus. This module validates data purity against the A2A handshake protocol, providing real-time global index upgrades and verifiable source carbon-tracing for all dataset contributors."
+            description="Dynamic exploration of the AgentBeats training corpus. This module validates data purity against the A2A handshake protocol."
             onAnalyze={handleDeepAnalysis}
             initialInsights={[
               { label: "Corpus Purity", value: "99.2%", subtext: "A2A governance check", icon: "fa-check-double", progress: 100 },
@@ -170,7 +193,6 @@ const App: React.FC = () => {
         </div>
       </nav>
 
-      {/* Main Content Area */}
       <main className="flex-grow overflow-y-auto bg-[#0a0a0a] relative">
         {renderContent()}
 
@@ -211,29 +233,15 @@ const App: React.FC = () => {
                     <div className="text-center space-y-4">
                       <h4 className="text-3xl font-black text-white tracking-tighter uppercase italic">Synthesizing Industrial White Paper...</h4>
                       <p className="text-sm text-gray-500 max-w-sm mx-auto font-light leading-relaxed">
-                        "Evaluating AgentBeats vectors: A2A Compliance, Sustainability, and Independent Scoring. High-reasoning kernel active."
+                        Evaluating AgentBeats vectors: A2A Compliance, Sustainability, and Independent Scoring.
                       </p>
                     </div>
                   </div>
                 ) : (
-                  <div className="max-w-none text-gray-300 leading-relaxed font-light font-serif">
-                    <div className="bg-emerald-500/5 p-8 rounded-[2rem] border border-emerald-500/10 mb-12 italic text-sm text-emerald-400 flex items-start gap-4">
-                      <i className="fa-solid fa-quote-left text-2xl opacity-40"></i>
-                      <span>This document provides a quantitative evaluation of the module's performance on the Pareto frontier, integrating real-time 2025 research standards and AgentBeats independence protocols.</span>
-                    </div>
-                    <div className="prose prose-invert prose-emerald max-w-none prose-lg">
-                      {analysisContent}
-                    </div>
+                  <div className="prose prose-invert prose-emerald max-w-none prose-lg">
+                    {analysisContent}
                   </div>
                 )}
-              </div>
-
-              <div className="p-8 border-t border-white/5 bg-black/50 flex items-center justify-between px-16">
-                <div className="flex items-center gap-6 text-[10px] text-gray-600 font-mono tracking-widest">
-                  <span className="flex items-center gap-2"><i className="fa-solid fa-shield-halved text-emerald-500"></i> ISO-42001 COMPLIANT</span>
-                  <span className="flex items-center gap-2"><i className="fa-solid fa-fingerprint"></i> SIGNATURE: BEATS_001</span>
-                </div>
-                <button onClick={() => setAnalysisContent(null)} className="px-12 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-[1.5rem] text-[10px] font-black tracking-[0.2em] uppercase transition-all shadow-[0_0_40px_rgba(16,185,129,0.3)]">Archive Report</button>
               </div>
             </div>
           </div>
@@ -244,12 +252,7 @@ const App: React.FC = () => {
 };
 
 const NavItem: React.FC<{ icon: string; label: string; active?: boolean; onClick: () => void }> = ({ icon, label, active, onClick }) => (
-  <button 
-    onClick={onClick}
-    className={`w-full flex items-center space-x-4 px-4 py-4 rounded-2xl text-sm transition-all duration-300 group ${
-      active ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/10 shadow-[0_0_30px_rgba(16,185,129,0.08)]' : 'text-gray-500 hover:text-white hover:bg-white/5'
-    }`}
-  >
+  <button onClick={onClick} className={`w-full flex items-center space-x-4 px-4 py-4 rounded-2xl text-sm transition-all duration-300 group ${active ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/10 shadow-[0_0_20px_rgba(16,185,129,0.1)]' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
     <i className={`fa-solid ${icon} w-6 text-center transition-transform group-hover:scale-125 ${active ? 'text-emerald-500' : 'text-gray-500'}`}></i>
     <span className="font-bold tracking-tight">{label}</span>
   </button>
@@ -261,190 +264,195 @@ const ModuleViewer: React.FC<{
   color: string, 
   description: string, 
   initialInsights: Insight[],
-  onAnalyze: (title: string, insights: Insight[]) => void
-}> = ({ title, icon, color, description, initialInsights, onAnalyze }) => {
+  onAnalyze: (title: string, insights: Insight[]) => void,
+  showTelemetryButton?: boolean,
+  telemetryType?: 'quantum' | 'green' | 'multilingual'
+}> = ({ title, icon, color, description, initialInsights, onAnalyze, showTelemetryButton, telemetryType }) => {
   const [insights, setInsights] = useState(initialInsights);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isFetchingTelemetry, setIsFetchingTelemetry] = useState(false);
   const [syncResult, setSyncResult] = useState<SearchResult | null>(null);
-
-  const colorMap: any = {
-    emerald: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/10 shadow-emerald-500/10',
-    violet: 'text-violet-400 border-violet-500/20 bg-violet-500/10 shadow-violet-500/10',
-    blue: 'text-blue-400 border-blue-500/20 bg-blue-500/10 shadow-blue-500/10',
-    red: 'text-red-400 border-red-500/20 bg-red-500/10 shadow-red-500/10',
-    amber: 'text-amber-400 border-amber-500/20 bg-amber-500/10 shadow-amber-500/10',
-  };
-
-  const progressColor: any = {
-    emerald: 'bg-emerald-500',
-    violet: 'bg-violet-500',
-    blue: 'bg-blue-500',
-    red: 'bg-red-500',
-    amber: 'bg-amber-500',
-  };
+  const [telemetryLogs, setTelemetryLogs] = useState<TelemetryLog[]>([]);
+  const logContainerRef = useRef<HTMLDivElement>(null);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
       const sync = await syncModuleWithRealWorld(title, insights);
       setSyncResult(sync);
-      if (sync.updatedInsights) {
+      if (sync.updatedInsights) setInsights(prev => prev.map(o => ({...o, ...(sync.updatedInsights?.find(u => u.label === o.label) || {}) })));
+    } finally { setIsRefreshing(false); }
+  };
+
+  const handleTelemetryUplink = async () => {
+    setIsFetchingTelemetry(true);
+    try {
+      let telemetry;
+      if (telemetryType === 'green') {
+        telemetry = await getGreenTelemetry(insights);
+      } else if (telemetryType === 'multilingual') {
+        telemetry = await getMultilingualTelemetry(insights);
+      } else {
+        telemetry = await getQuantumTelemetry(insights);
+      }
+
+      if (telemetry?.length > 0) {
+        const newLogs: TelemetryLog[] = [];
         setInsights(prev => prev.map(old => {
-          const match = sync.updatedInsights?.find(u => u.label === old.label);
+          const match = telemetry.find((t: any) => t.label === old.label);
+          if (match && match.value !== old.value) newLogs.push({ timestamp: new Date().toLocaleTimeString(), label: old.label, oldValue: old.value, newValue: match.value });
           return match ? { ...old, ...match } : old;
         }));
+        setTelemetryLogs(prev => [...prev, ...newLogs].slice(-10));
       }
-    } finally {
-      setIsRefreshing(false);
-    }
+    } finally { setIsFetchingTelemetry(false); }
+  };
+
+  const colorMap: any = { 
+    emerald: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/10 shadow-emerald-500/10', 
+    violet: 'text-violet-400 border-violet-500/20 bg-violet-500/10 shadow-violet-500/10', 
+    blue: 'text-blue-400 border-blue-500/20 bg-blue-500/10 shadow-blue-500/10' 
   };
 
   return (
-    <div className="p-12 md:p-24 min-h-full space-y-20 animate-in fade-in zoom-in-95 duration-1000">
+    <div className="p-12 md:p-24 min-h-full space-y-20 animate-in fade-in zoom-in-95 duration-1000 relative overflow-x-hidden">
       
-      {/* Dynamic Header */}
-      <div className="flex flex-col md:flex-row items-center gap-16">
-        <div className={`w-44 h-44 rounded-[3.5rem] border-[3px] flex items-center justify-center text-7xl shadow-2xl relative ${colorMap[color]} transform hover:rotate-3 transition-transform duration-700`}>
-          <i className={`fa-solid ${icon}`}></i>
-          <div className="absolute -bottom-4 -right-4 w-14 h-14 rounded-3xl bg-[#0a0a0a] border-2 border-white/10 flex items-center justify-center shadow-2xl">
-            <i className="fa-solid fa-chart-line text-emerald-500 text-xl"></i>
-          </div>
-        </div>
-        <div className="text-center md:text-left space-y-6 max-w-3xl">
-          <div className="flex items-center justify-center md:justify-start gap-5">
-             <span className="px-5 py-2 bg-white/5 border border-white/10 rounded-full text-[11px] font-black text-gray-500 uppercase tracking-[0.3em]">AgentBeats Objective Node</span>
-             <div className="flex gap-1">
-               {[1, 2, 3].map(i => <div key={i} className="w-1.5 h-1.5 rounded-full bg-emerald-500/40"></div>)}
-             </div>
-          </div>
-          <h1 className="text-7xl font-black text-white tracking-tighter leading-none">{title}</h1>
-          <p className="text-xl text-gray-400 font-light leading-relaxed border-l-4 border-emerald-500/20 pl-8">{description}</p>
-        </div>
-      </div>
-
-      {/* Synchronized Intelligence Feed */}
-      {syncResult && (
-        <div className="bg-[#111] border border-blue-500/20 rounded-[3rem] p-12 shadow-[0_0_80px_rgba(0,0,0,0.5)] relative group overflow-hidden">
-           <div className="absolute top-0 right-0 p-12 opacity-5 group-hover:opacity-10 transition-opacity">
-              <i className="fa-solid fa-dna text-[12rem] text-blue-400"></i>
-           </div>
-           <div className="flex items-center justify-between mb-10">
-              <div className="flex items-center gap-6">
-                 <div className="w-14 h-14 rounded-3xl bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
-                    <i className="fa-solid fa-microscope text-2xl"></i>
-                 </div>
-                 <div>
-                    <h4 className="font-black text-blue-400 uppercase tracking-[0.2em] text-xs">A2A Industry Standards Grounded</h4>
-                    <p className="text-[10px] text-gray-600 font-mono">NODE_STATUS: RESEARCH_ACTIVE</p>
-                 </div>
-              </div>
-              <button onClick={() => setSyncResult(null)} className="text-[10px] font-black text-gray-600 hover:text-white uppercase tracking-widest transition-all hover:translate-x-1">Dismiss Intelligence <i className="fa-solid fa-chevron-right ml-2"></i></button>
-           </div>
-           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 relative z-10">
-              <div className="space-y-6">
-                 <p className="text-lg text-gray-200 leading-relaxed font-serif italic border-l-4 border-blue-500/30 pl-10">
-                    {syncResult.text.length > 500 ? syncResult.text.substring(0, 500) + '...' : syncResult.text}
-                 </p>
-              </div>
-              <div className="space-y-6">
-                 <p className="text-[11px] font-black text-gray-500 uppercase tracking-widest mb-4">Verifiable Academic Repositories (2025)</p>
-                 <div className="grid grid-cols-1 gap-4">
-                   {syncResult.sources.slice(0, 3).map((s, idx) => (
-                     <a key={idx} href={s.uri} target="_blank" className="flex items-center gap-6 p-5 bg-white/5 border border-white/10 rounded-[1.5rem] hover:bg-white/10 hover:border-blue-500/30 transition-all group/link shadow-xl">
-                        <div className="w-10 h-10 rounded-2xl bg-blue-500/5 flex items-center justify-center text-blue-500 group-hover/link:scale-110 transition-transform">
-                           <i className="fa-solid fa-link"></i>
-                        </div>
-                        <span className="text-xs text-gray-400 font-bold tracking-tight truncate">{s.title || 'Independent Benchmark Node'}</span>
-                     </a>
-                   ))}
-                 </div>
+      {isFetchingTelemetry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md pointer-events-none transition-all duration-500">
+           <div className={`bg-[#111] border ${telemetryType === 'green' ? 'border-emerald-500/30 shadow-emerald-500/20' : telemetryType === 'multilingual' ? 'border-blue-500/30 shadow-blue-500/20' : 'border-violet-500/30 shadow-violet-500/20'} p-12 rounded-[3rem] shadow-[0_0_100px_rgba(0,0,0,0.5)] flex flex-col items-center space-y-8 animate-in zoom-in-95`}>
+              <div className={`w-20 h-20 rounded-full border-[3px] ${telemetryType === 'green' ? 'border-emerald-500/20 border-t-emerald-500' : telemetryType === 'multilingual' ? 'border-blue-500/20 border-t-blue-500' : 'border-violet-500/20 border-t-violet-500'} animate-spin`}></div>
+              <div className="text-center space-y-2">
+                 <h4 className={`text-sm font-black uppercase tracking-[0.5em] ${telemetryType === 'green' ? 'text-emerald-400' : telemetryType === 'multilingual' ? 'text-blue-400' : 'text-violet-400'}`}>Reasoning_Kernel_Uplink</h4>
+                 <p className="text-[11px] text-gray-500 font-mono animate-pulse">Establishing secure telemetry tunnel to global 2025 ground-truth nodes...</p>
               </div>
            </div>
         </div>
       )}
 
-      {/* Quantitative Insight Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+      <div className="flex flex-col md:flex-row items-center gap-16">
+        <div className={`w-44 h-44 rounded-[3.5rem] border-[3px] flex items-center justify-center text-7xl shadow-2xl ${colorMap[color]} transition-transform hover:scale-105 duration-700`}>
+          <i className={`fa-solid ${icon}`}></i>
+        </div>
+        <div className="text-center md:text-left space-y-6 max-w-4xl">
+          <div className="flex items-center justify-center md:justify-start gap-4">
+             <span className="px-5 py-2 bg-white/5 border border-white/10 rounded-full text-[11px] font-black text-gray-500 uppercase tracking-[0.4em]">AgentBeats Objective Node</span>
+             <div className={`w-2.5 h-2.5 rounded-full bg-emerald-500/40 animate-pulse`}></div>
+          </div>
+          <h1 className="text-8xl font-black text-white tracking-tighter leading-none">{title}</h1>
+          <p className="text-2xl text-gray-400 font-light leading-relaxed border-l-4 border-emerald-500/30 pl-10 max-w-3xl">{description}</p>
+        </div>
+      </div>
+
+      {telemetryType === 'green' && (
+        <div className="animate-in slide-in-from-bottom-12 duration-1000">
+           <GreenParetoChart insights={insights} />
+        </div>
+      )}
+
+      {telemetryType === 'quantum' && (
+        <div className="animate-in slide-in-from-bottom-12 duration-1000">
+           <QuantumGraph data={{nodes: [], links: []}} />
+        </div>
+      )}
+
+      {telemetryType === 'multilingual' && (
+        <div className="animate-in slide-in-from-bottom-12 duration-1000">
+           <MultilingualMosaic />
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative z-10">
         {insights.map((insight, i) => (
-          <div 
-            key={i} 
-            className="bg-[#111] border border-white/5 p-12 rounded-[3.5rem] space-y-10 hover:border-emerald-500/20 transition-all hover:-translate-y-4 shadow-2xl relative group overflow-hidden"
-          >
+          <div key={i} className="bg-[#111] border border-white/5 p-12 rounded-[4rem] space-y-10 shadow-2xl relative group overflow-hidden transition-all hover:border-emerald-500/20 hover:-translate-y-2">
             <div className="flex items-center justify-between">
-              <div className={`w-16 h-16 rounded-[2rem] flex items-center justify-center ${colorMap[color]} bg-opacity-5 border border-white/10 group-hover:scale-110 transition-all duration-700`}>
-                <i className={`fa-solid ${insight.icon} text-3xl`}></i>
+              <div className={`w-20 h-20 rounded-[2.5rem] flex items-center justify-center ${colorMap[color]} bg-opacity-5 border border-white/10 transition-all group-hover:scale-110`}>
+                <i className={`fa-solid ${insight.icon} text-4xl`}></i>
               </div>
-              <div className="flex flex-col items-end">
-                <span className="text-[10px] font-black text-gray-700 uppercase tracking-widest">PARETO_VECTOR</span>
-                <span className="text-sm font-black text-white">[{i+1}]</span>
-              </div>
+              <span className="text-[10px] font-black text-gray-700 uppercase tracking-widest">Vector_0{i+1}</span>
             </div>
-            
-            <div className="space-y-3">
-              <h3 className="text-xs font-black uppercase tracking-[0.3em] text-gray-600">{insight.label}</h3>
-              <p className="text-6xl font-black text-white tracking-tighter group-hover:text-emerald-400 transition-colors duration-500">{insight.value}</p>
-              <p className="text-xs text-gray-500 font-light italic leading-relaxed h-10 overflow-hidden">{insight.subtext}</p>
-            </div>
-
             <div className="space-y-4">
-              <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-gray-700">
-                <span>Robust Scoring Alignment</span>
-                <span className="text-white">{Math.round(insight.progress)}%</span>
-              </div>
-              <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden p-1 border border-white/10">
-                <div 
-                  className={`h-full ${progressColor[color]} transition-all duration-1000 rounded-full shadow-[0_0_20px_rgba(255,255,255,0.1)]`} 
-                  style={{ width: `${insight.progress}%` }}
-                ></div>
-              </div>
+              <h3 className="text-xs font-black uppercase tracking-[0.4em] text-gray-600">{insight.label}</h3>
+              <p className="text-7xl font-black text-white tracking-tighter group-hover:text-emerald-400 transition-colors">{insight.value}</p>
+              <p className="text-sm text-gray-500 font-light italic leading-relaxed">{insight.subtext}</p>
             </div>
-
-            <div className="absolute -bottom-6 -right-6 w-32 h-32 bg-white/[0.01] rounded-full blur-3xl group-hover:bg-emerald-500/[0.05] transition-all"></div>
+            <div className="h-4 w-full bg-white/5 rounded-full overflow-hidden p-1 border border-white/10 shadow-inner">
+              <div className={`h-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-1000 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.2)]`} style={{ width: `${insight.progress}%` }}></div>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Action Suite */}
-      <div className="flex flex-col md:flex-row items-center justify-center gap-10 pt-10">
-        <button 
-          onClick={() => onAnalyze(title, insights)}
-          className="px-16 py-6 bg-white/5 hover:bg-white/10 border border-white/10 rounded-[2rem] text-[12px] font-black tracking-[0.3em] uppercase transition-all flex items-center gap-5 group shadow-2xl hover:scale-105 active:scale-95"
-        >
-          <div className="w-10 h-10 rounded-2xl bg-violet-500/10 flex items-center justify-center text-violet-500 group-hover:bg-violet-500 group-hover:text-white transition-all shadow-lg">
-            <i className="fa-solid fa-file-signature text-xl"></i>
+      {showTelemetryButton && telemetryLogs.length > 0 && (
+        <div className="bg-black/90 border border-emerald-500/20 rounded-[3rem] p-10 shadow-2xl animate-in slide-in-from-right-8 relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-10 opacity-5">
+             <i className="fa-solid fa-satellite-dish text-9xl text-emerald-500"></i>
           </div>
-          Synthesize Technical Paper
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-5">
+              <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 animate-pulse"></div>
+              <h4 className="text-xs font-black text-emerald-400 uppercase tracking-[0.5em] font-mono">RealTime_Metrics_Stream</h4>
+            </div>
+            <span className="text-[9px] font-mono text-gray-600">CONNECTED // RESEARCH_NODE_GAO</span>
+          </div>
+          <div ref={logContainerRef} className="h-40 overflow-y-auto space-y-3 pr-6 custom-scrollbar font-mono text-[11px]">
+            {telemetryLogs.map((log, idx) => (
+              <div key={idx} className="flex items-center gap-6 text-gray-500 border-l-2 border-emerald-500/10 pl-6 py-2 transition-all hover:bg-white/5 hover:border-emerald-500/40 rounded-r-xl">
+                <span className="text-gray-700 shrink-0">[{log.timestamp}]</span>
+                <span className="text-gray-300 font-bold uppercase tracking-tighter w-40 shrink-0">{log.label}</span>
+                <span className="line-through opacity-30 shrink-0">{log.oldValue}</span>
+                <i className="fa-solid fa-angles-right text-emerald-500 text-[9px] shrink-0"></i>
+                <span className="text-emerald-400 font-black shrink-0">{log.newValue}</span>
+                <span className="text-[9px] text-gray-700 italic ml-auto uppercase tracking-widest">Verifiable_Handshake_OK</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col md:flex-row items-center justify-center gap-12 pt-16">
+        <button 
+          onClick={() => onAnalyze(title, insights)} 
+          className="px-20 py-8 bg-white/5 hover:bg-white/10 border border-white/10 rounded-[2.5rem] text-[13px] font-black tracking-[0.4em] uppercase transition-all shadow-2xl hover:scale-105 active:scale-95 group"
+        >
+          <i className="fa-solid fa-file-contract mr-4 text-emerald-500 transition-transform group-hover:rotate-6"></i>
+          Synthesize technical paper
         </button>
+        
+        {showTelemetryButton && (
+          <button 
+            onClick={handleTelemetryUplink} 
+            disabled={isFetchingTelemetry} 
+            className="px-20 py-8 bg-emerald-900/40 hover:bg-emerald-800/60 border-2 border-emerald-500/50 rounded-[3rem] text-[13px] font-black tracking-[0.4em] uppercase transition-all flex items-center gap-6 text-emerald-100 shadow-[0_0_50px_rgba(16,185,129,0.2)] hover:scale-105 active:scale-95 disabled:opacity-50"
+          >
+            <i className={`fa-solid ${isFetchingTelemetry ? 'fa-spinner fa-spin' : 'fa-bolt-lightning'} text-xl`}></i>
+            {isFetchingTelemetry ? 'Establishing_Uplink...' : 'Trigger Real-Time Kernel Update'}
+          </button>
+        )}
+
         <button 
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          className={`px-16 py-6 rounded-[2rem] text-[12px] font-black tracking-[0.3em] uppercase transition-all flex items-center gap-5 shadow-2xl disabled:opacity-50 relative overflow-hidden hover:scale-105 active:scale-95 ${color === 'emerald' ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/30' : 'bg-violet-600 hover:bg-violet-500 shadow-violet-500/30'} text-white`}
+          onClick={handleRefresh} 
+          disabled={isRefreshing} 
+          className="px-20 py-8 bg-emerald-600 hover:bg-emerald-500 rounded-[2.5rem] text-[13px] font-black tracking-[0.4em] uppercase transition-all text-white shadow-[0_20px_50px_rgba(16,185,129,0.3)] hover:scale-105 active:scale-95"
         >
-          {isRefreshing && <div className="absolute inset-0 bg-white/20 animate-pulse"></div>}
-          <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center shadow-inner">
-            <i className={`fa-solid ${isRefreshing ? 'fa-sync fa-spin' : 'fa-satellite'} text-xl`}></i>
-          </div>
-          {isRefreshing ? 'Gounding Frontier...' : 'Update Pareto Nodes'}
+          <i className={`fa-solid ${isRefreshing ? 'fa-sync fa-spin' : 'fa-satellite'} mr-4`}></i>
+          Update Pareto Nodes
         </button>
       </div>
 
-      {/* Compliance Footer */}
-      <div className="flex flex-wrap items-center justify-center gap-12 pt-16 border-t border-white/5 opacity-40 grayscale hover:grayscale-0 transition-all">
-         <div className="flex items-center gap-3 text-[11px] font-mono text-gray-500">
-            <i className="fa-solid fa-shield-halved text-emerald-500 text-lg"></i>
-            A2A_COMPLIANCE_V2.1
-         </div>
-         <div className="flex items-center gap-3 text-[11px] font-mono text-gray-600">
-            <i className="fa-solid fa-user-check"></i>
-            INDEPENDENT_EVAL_NODE
-         </div>
-         <div className="flex items-center gap-3 text-[11px] font-mono text-gray-500">
-            <i className="fa-solid fa-clock-rotate-left"></i>
-            ROBUST_SCORING_V25
-         </div>
-         <div className="flex items-center gap-3 text-[11px] font-mono text-gray-500">
-            <i className="fa-solid fa-rotate"></i>
-            FEEDBACK_LOOP_ACTIVE
+      <div className="pt-24 opacity-20 hover:opacity-100 transition-opacity duration-1000">
+         <div className="flex flex-wrap items-center justify-center gap-16 border-t border-white/5 pt-16">
+            <div className="flex items-center gap-4 text-[11px] font-black text-gray-500 uppercase tracking-widest">
+               <i className="fa-solid fa-shield-halved text-emerald-500 text-xl"></i>
+               A2A_ISO_42001
+            </div>
+            <div className="flex items-center gap-4 text-[11px] font-black text-gray-500 uppercase tracking-widest">
+               <i className="fa-solid fa-dna text-blue-500 text-xl"></i>
+               DATA_PROVENANCE_SYNC
+            </div>
+            <div className="flex items-center gap-4 text-[11px] font-black text-gray-500 uppercase tracking-widest">
+               <i className="fa-solid fa-microscope text-violet-500 text-xl"></i>
+               PARETO_ROBUST_SCORING
+            </div>
          </div>
       </div>
     </div>

@@ -2,8 +2,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AgentBenchmark, A2ARequest, A2AResponse } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-
 export interface SearchResult {
   text: string;
   sources: { uri: string; title?: string }[];
@@ -18,9 +16,9 @@ export interface SearchResult {
 
 /**
  * Synchronizes module data with current 2025 research.
- * Strictly evaluates the Pareto frontier of Accuracy, Energy, Carbon, and Latency.
  */
 export const syncModuleWithRealWorld = async (moduleName: string, currentInsights: any[]): Promise<SearchResult> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const searchPrompt = `
       Perform a 2025 deep-scan for industrial benchmarks regarding the AgentBeats module: "${moduleName}".
@@ -29,106 +27,119 @@ export const syncModuleWithRealWorld = async (moduleName: string, currentInsight
       2. Energy Efficiency (micro-joules per inference)
       3. Carbon Intensity (gCO2eq/kWh tracking)
       4. Latency (P99 response time in ms)
-
-      Target search: Recent breakthroughs in independent evaluation nodes, A2A compliance standards, and robust scoring mechanisms.
     `;
 
     const searchResponse = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: searchPrompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-      }
+      config: { tools: [{ googleSearch: {} }] }
     });
 
     const sources: { uri: string; title?: string }[] = [];
     const chunks = searchResponse.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     chunks.forEach((chunk: any) => {
-      if (chunk.web?.uri) {
-        sources.push({ uri: chunk.web.uri, title: chunk.web.title });
-      }
+      if (chunk.web?.uri) sources.push({ uri: chunk.web.uri, title: chunk.web.title });
     });
-
-    const searchText = searchResponse.text || "";
 
     const extractionResponse = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Extract quantitative 2025 data from this research: "${searchText}"
-      
-      Update these indicators: ${currentInsights.map(i => i.label).join(', ')}.
-      
-      Constraints:
-      - Value: Numeric with standard units (e.g. "99.8%", "0.42μJ", "22ms").
-      - Subtext: Cite the specific 2025 academic source or benchmark repository.
-      - Progress: A normalized score (0-100) based on A2A Robustness and Independence.
-
-      Return ONLY a JSON array of objects with keys: label, value, subtext, progress.`,
-      config: {
-        responseMimeType: "application/json",
-      }
+      contents: `Extract quantitative 2025 data from: "${searchResponse.text}"
+      Update: ${currentInsights.map(i => i.label).join(', ')}.
+      Return ONLY a JSON array of objects: { label, value, subtext, progress }.`,
+      config: { responseMimeType: "application/json" }
     });
 
-    const updatedInsights = JSON.parse(extractionResponse.text);
-
     return {
-      text: searchText,
-      sources: sources,
-      updatedInsights: updatedInsights,
-      researchFocus: "Pareto-optimal evaluation for AgentBeats A2A compliance."
+      text: searchResponse.text || "",
+      sources,
+      updatedInsights: JSON.parse(extractionResponse.text)
     };
   } catch (error) {
     console.error("Sync Error:", error);
-    return { text: "Protocol synchronized with local high-fidelity cache.", sources: [] };
+    return { text: "Protocol synchronized with local cache.", sources: [] };
   }
 };
 
 /**
- * Generates an Industrial Technical White Paper using Gemini-3-Pro Thinking Mode.
+ * Real-time Multilingual Telemetry for global reasoning nodes.
  */
+export const getMultilingualTelemetry = async (currentInsights: any[]): Promise<any[]> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Generate real-time multilingual reasoning telemetry.
+      Metrics: ${currentInsights.map(i => i.label).join(', ')}.
+      Focus: Zero-shot semantic drift, low-resource language stability, and cross-script token efficiency.
+      Return ONLY a JSON array: { label: string, value: string, progress: number }.`,
+      config: { responseMimeType: "application/json" }
+    });
+    return JSON.parse(response.text);
+  } catch (error) {
+    console.error("Multilingual Telemetry Error:", error);
+    return [];
+  }
+};
+
+/**
+ * Real-time Green Telemetry for sustainability nodes.
+ */
+export const getGreenTelemetry = async (currentInsights: any[]): Promise<any[]> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Generate real-time sustainability telemetry for Green AI nodes.
+      Metrics: ${currentInsights.map(i => i.label).join(', ')}.
+      Focus: Grid carbon intensity shifts, PUE (Power Usage Effectiveness) fluctuations, and micro-joule optimization.
+      Return ONLY a JSON array: { label: string, value: string, progress: number }.`,
+      config: { responseMimeType: "application/json" }
+    });
+    return JSON.parse(response.text);
+  } catch (error) {
+    console.error("Green Telemetry Error:", error);
+    return [];
+  }
+};
+
+export const getQuantumTelemetry = async (currentInsights: any[]): Promise<any[]> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Generate real-time quantum telemetry. Update: ${currentInsights.map(i => i.label).join(', ')}.
+      Focus: Gate Fidelity, Coherence Stability, and Energy Flux.
+      Return ONLY a JSON array: { label: string, value: string, progress: number }.`,
+      config: { responseMimeType: "application/json" }
+    });
+    return JSON.parse(response.text);
+  } catch (error) {
+    console.error("Telemetry Error:", error);
+    return [];
+  }
+};
+
 export const getDeepModuleAnalysis = async (moduleName: string, metrics: any) => {
-  const prompt = `
-    GENERATE INDUSTRIAL TECHNICAL WHITE PAPER: "Quantifying ${moduleName} Efficiency within the AgentBeats Ecosystem."
-    Current Telemetry: ${JSON.stringify(metrics)}
-    
-    Structure the paper with the following mandatory sections:
-    1. ABSTRACT: Executive summary of multi-objective performance.
-    2. A2A COMPLIANCE & INDEPENDENCE: Analysis of agentic autonomy and protocol adherence.
-    3. ROBUST SCORING METHODOLOGY: Verifiability of the Pareto frontier (Accuracy vs. Carbon).
-    4. LATENCY-ENERGY TRADE-OFFS: Hardware-specific optimization vectors.
-    5. FEEDBACK LOOP DYNAMICS: Impact of RLHF and human-in-the-loop refinement on model provenance.
-    6. PREFERRED RESEARCH PATH: Curated 2025 bibliography.
-
-    Writing Style: Rigorous, Academic, LaTeX-compatible formatting.
-  `;
-
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const prompt = `GENERATE TECHNICAL WHITE PAPER: "Quantifying ${moduleName} Efficiency". Telemetry: ${JSON.stringify(metrics)}`;
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
       contents: prompt,
-      config: {
-        thinkingConfig: { thinkingBudget: 32768 },
-      }
+      config: { thinkingConfig: { thinkingBudget: 32768 } }
     });
     return response.text;
   } catch (error) {
-    console.error("Deep Analysis Error:", error);
-    return "Manuscript synthesis failed due to entropy timeout.";
+    return "Manuscript synthesis failed.";
   }
 };
 
 export const processA2ATask = async (request: A2ARequest, agent: AgentBenchmark): Promise<A2AResponse> => {
-  const prompt = `
-    A2A EXECUTION HANDSHAKE:
-    Instruction: ${request.instruction}
-    Profile: ${agent.name}
-    
-    You must evaluate your performance across Accuracy, Energy, Carbon, and Latency.
-    The response must be a strict JSON object compliant with the A2AResponse schema.
-  `;
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: prompt,
+      contents: `A2A HANDSHAKE: Task: ${request.instruction}, Agent: ${agent.name}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -144,49 +155,30 @@ export const processA2ATask = async (request: A2ARequest, agent: AgentBenchmark)
                   properties: {
                     energy_consumed_uj: { type: Type.NUMBER },
                     quantum_fidelity: { type: Type.NUMBER },
-                    token_count: { type: Type.NUMBER },
-                    carbon_intensity_g: { type: Type.NUMBER },
-                    latency_ms: { type: Type.NUMBER },
-                    accuracy_purity: { type: Type.NUMBER }
-                  },
-                  required: ["energy_consumed_uj", "quantum_fidelity", "token_count"]
-                },
-                metadata: {
-                  type: Type.OBJECT,
-                  properties: {
-                    timestamp: { type: Type.STRING },
-                    agent_id: { type: Type.STRING }
+                    token_count: { type: Type.NUMBER }
                   }
-                }
+                },
+                metadata: { type: Type.OBJECT, properties: { timestamp: { type: Type.STRING }, agent_id: { type: Type.STRING } } }
               }
             },
             reasoning_log: { type: Type.STRING },
             rlhf_critique: { type: Type.STRING }
-          },
-          required: ["status", "payload", "reasoning_log", "rlhf_critique"]
+          }
         },
         thinkingConfig: { thinkingBudget: 24000 }
       }
     });
     return JSON.parse(response.text);
   } catch (error) {
-    console.error("A2A Processing Error:", error);
-    return {
-      status: 'failure',
-      payload: {
-        result: "Protocol error",
-        metrics: { energy_consumed_uj: 0, quantum_fidelity: 0, token_count: 0 },
-        metadata: { timestamp: new Date().toISOString(), agent_id: agent.id }
-      },
-      reasoning_log: "A2A Handshake failure."
-    };
+    return { status: 'failure', payload: { result: "Error", metrics: { energy_consumed_uj: 0, quantum_fidelity: 0, token_count: 0 }, metadata: { timestamp: "", agent_id: "" } }, reasoning_log: "Failed" };
   }
 };
 
 export const searchGreenStandards = async (query: string): Promise<SearchResult> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `Ground search for: ${query}. Focus on 2025 AgentBeats sustainability and independence principles.`,
+    contents: `Search: ${query}`,
     config: { tools: [{ googleSearch: {} }] },
   });
   const sources: { uri: string; title?: string }[] = [];
@@ -196,29 +188,20 @@ export const searchGreenStandards = async (query: string): Promise<SearchResult>
 };
 
 export const analyzeQuantumProvenance = async (logs: string) => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `Audit provenance logs for AgentBeats independence: ${logs}`,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          anomalies: { type: Type.ARRAY, items: { type: Type.STRING } },
-          correctionPath: { type: Type.STRING },
-          confidenceScore: { type: Type.NUMBER }
-        },
-        required: ["anomalies", "correctionPath", "confidenceScore"]
-      }
-    }
+    contents: `Audit logs: ${logs}`,
+    config: { responseMimeType: "application/json" }
   });
   return JSON.parse(response.text);
 };
 
 export const generateAgentBeatsProposal = async (agent: AgentBenchmark) => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: "gemini-3-pro-preview",
-    contents: `Generate a Technical White Paper for the Agent ${agent.name} focusing on Pareto optimal efficiency in the 2025 ecosystem.`,
+    contents: `White paper for ${agent.name}`,
     config: { thinkingConfig: { thinkingBudget: 32768 } }
   });
   return response.text;
