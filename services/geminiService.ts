@@ -61,6 +61,69 @@ export const syncModuleWithRealWorld = async (moduleName: string, currentInsight
 };
 
 /**
+ * Real-time Provenance Telemetry.
+ */
+export const getProvenanceTelemetry = async (currentInsights: any[]): Promise<any[]> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Generate real-time data provenance telemetry for AgentBeats. 
+      Metrics: ${currentInsights.map(i => i.label).join(', ')}.
+      Focus on causal path stability, graph entropy fluctuations, and lineage integrity.
+      Return ONLY a JSON array: { label: string, value: string, progress: number }.`,
+      config: { responseMimeType: 'application/json' }
+    });
+    return JSON.parse(response.text);
+  } catch (error) {
+    console.error("Provenance Telemetry Error:", error);
+    return [];
+  }
+};
+
+/**
+ * Real-time Error Correction Telemetry.
+ */
+export const getErrorCorrectionTelemetry = async (currentInsights: any[]): Promise<any[]> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Generate real-time Quantum Error Correction (QEC) telemetry.
+      Metrics: ${currentInsights.map(i => i.label).join(', ')}.
+      Focus on syndrome detection latency, surface code fidelity, and logical vs physical qubit ratios.
+      Return ONLY a JSON array: { label: string, value: string, progress: number }.`,
+      config: { responseMimeType: 'application/json' }
+    });
+    return JSON.parse(response.text);
+  } catch (error) {
+    console.error("Error Correction Telemetry Error:", error);
+    return [];
+  }
+};
+
+/**
+ * Real-time Dataset Telemetry.
+ */
+export const getDatasetTelemetry = async (currentInsights: any[]): Promise<any[]> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Generate real-time corpus explorer telemetry.
+      Metrics: ${currentInsights.map(i => i.label).join(', ')}.
+      Focus on data purity, A2A handshake compliance, and crawling carbon efficiency.
+      Return ONLY a JSON array: { label: string, value: string, progress: number }.`,
+      config: { responseMimeType: 'application/json' }
+    });
+    return JSON.parse(response.text);
+  } catch (error) {
+    console.error("Dataset Telemetry Error:", error);
+    return [];
+  }
+};
+
+/**
  * Real-time Multilingual Telemetry for global reasoning nodes.
  */
 export const getMultilingualTelemetry = async (currentInsights: any[]): Promise<any[]> => {
@@ -165,7 +228,7 @@ export const processA2ATask = async (request: A2ARequest, agent: AgentBenchmark)
             rlhf_critique: { type: Type.STRING }
           }
         },
-        thinkingConfig: { thinkingBudget: 24000 }
+        thinkingConfig: { thinkingBudget: 32768 }
       }
     });
     return JSON.parse(response.text);

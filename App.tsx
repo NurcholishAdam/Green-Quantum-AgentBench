@@ -11,7 +11,10 @@ import {
   SearchResult, 
   getQuantumTelemetry, 
   getGreenTelemetry,
-  getMultilingualTelemetry
+  getMultilingualTelemetry,
+  getProvenanceTelemetry,
+  getErrorCorrectionTelemetry,
+  getDatasetTelemetry
 } from './services/geminiService';
 
 type TabType = 'dashboard' | 'quantum' | 'green' | 'multilingual' | 'qlgraph' | 'error' | 'dataset';
@@ -110,6 +113,8 @@ const App: React.FC = () => {
             color="blue" 
             description="Visualizing the lineage of agent decisions via high-fidelity, synchronized nodes. This module ensures Data Provenance and Independence by tracing the causal decision path."
             onAnalyze={handleDeepAnalysis}
+            showTelemetryButton={true}
+            telemetryType="qlgraph"
             initialInsights={[
               { label: "Lineage Clarity", value: "99.9%", subtext: "Data origin fidelity", icon: "fa-fingerprint", progress: 100 },
               { label: "Graph Entropy", value: "0.024b", subtext: "Decision path stability", icon: "fa-route", progress: 95 },
@@ -125,6 +130,8 @@ const App: React.FC = () => {
             color="red" 
             description="Monitoring Surface Code resilience (d=7) for fault-tolerant agentic reasoning. We implement a robust scoring feedback loop to predict failure modes."
             onAnalyze={handleDeepAnalysis}
+            showTelemetryButton={true}
+            telemetryType="error"
             initialInsights={[
               { label: "Logical Fidelity", value: "99.999%", subtext: "d=7 Distance Surface", icon: "fa-shield-heart", progress: 99 },
               { label: "Cycle Overhead", value: "18%", subtext: "Syndrome compute cost", icon: "fa-gears", progress: 45 },
@@ -140,6 +147,8 @@ const App: React.FC = () => {
             color="amber" 
             description="Dynamic exploration of the AgentBeats training corpus. This module validates data purity against the A2A handshake protocol."
             onAnalyze={handleDeepAnalysis}
+            showTelemetryButton={true}
+            telemetryType="dataset"
             initialInsights={[
               { label: "Corpus Purity", value: "99.2%", subtext: "A2A governance check", icon: "fa-check-double", progress: 100 },
               { label: "Collection Carbon", value: "1.2kg", subtext: "Lifecycle crawling cost", icon: "fa-leaf", progress: 65 },
@@ -266,7 +275,7 @@ const ModuleViewer: React.FC<{
   initialInsights: Insight[],
   onAnalyze: (title: string, insights: Insight[]) => void,
   showTelemetryButton?: boolean,
-  telemetryType?: 'quantum' | 'green' | 'multilingual'
+  telemetryType?: 'quantum' | 'green' | 'multilingual' | 'qlgraph' | 'error' | 'dataset'
 }> = ({ title, icon, color, description, initialInsights, onAnalyze, showTelemetryButton, telemetryType }) => {
   const [insights, setInsights] = useState(initialInsights);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -288,12 +297,26 @@ const ModuleViewer: React.FC<{
     setIsFetchingTelemetry(true);
     try {
       let telemetry;
-      if (telemetryType === 'green') {
-        telemetry = await getGreenTelemetry(insights);
-      } else if (telemetryType === 'multilingual') {
-        telemetry = await getMultilingualTelemetry(insights);
-      } else {
-        telemetry = await getQuantumTelemetry(insights);
+      switch (telemetryType) {
+        case 'green':
+          telemetry = await getGreenTelemetry(insights);
+          break;
+        case 'multilingual':
+          telemetry = await getMultilingualTelemetry(insights);
+          break;
+        case 'qlgraph':
+          telemetry = await getProvenanceTelemetry(insights);
+          break;
+        case 'error':
+          telemetry = await getErrorCorrectionTelemetry(insights);
+          break;
+        case 'dataset':
+          telemetry = await getDatasetTelemetry(insights);
+          break;
+        case 'quantum':
+        default:
+          telemetry = await getQuantumTelemetry(insights);
+          break;
       }
 
       if (telemetry?.length > 0) {
@@ -311,7 +334,9 @@ const ModuleViewer: React.FC<{
   const colorMap: any = { 
     emerald: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/10 shadow-emerald-500/10', 
     violet: 'text-violet-400 border-violet-500/20 bg-violet-500/10 shadow-violet-500/10', 
-    blue: 'text-blue-400 border-blue-500/20 bg-blue-500/10 shadow-blue-500/10' 
+    blue: 'text-blue-400 border-blue-500/20 bg-blue-500/10 shadow-blue-500/10',
+    amber: 'text-amber-400 border-amber-500/20 bg-amber-500/10 shadow-amber-500/10',
+    red: 'text-red-400 border-red-500/20 bg-red-500/10 shadow-red-500/10'
   };
 
   return (
@@ -319,10 +344,25 @@ const ModuleViewer: React.FC<{
       
       {isFetchingTelemetry && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md pointer-events-none transition-all duration-500">
-           <div className={`bg-[#111] border ${telemetryType === 'green' ? 'border-emerald-500/30 shadow-emerald-500/20' : telemetryType === 'multilingual' ? 'border-blue-500/30 shadow-blue-500/20' : 'border-violet-500/30 shadow-violet-500/20'} p-12 rounded-[3rem] shadow-[0_0_100px_rgba(0,0,0,0.5)] flex flex-col items-center space-y-8 animate-in zoom-in-95`}>
-              <div className={`w-20 h-20 rounded-full border-[3px] ${telemetryType === 'green' ? 'border-emerald-500/20 border-t-emerald-500' : telemetryType === 'multilingual' ? 'border-blue-500/20 border-t-blue-500' : 'border-violet-500/20 border-t-violet-500'} animate-spin`}></div>
+           <div className={`bg-[#111] border ${
+             telemetryType === 'green' ? 'border-emerald-500/30 shadow-emerald-500/20' : 
+             telemetryType === 'multilingual' ? 'border-blue-500/30 shadow-blue-500/20' : 
+             telemetryType === 'error' ? 'border-red-500/30 shadow-red-500/20' :
+             telemetryType === 'dataset' ? 'border-amber-500/30 shadow-amber-500/20' :
+             'border-violet-500/30 shadow-violet-500/20'} p-12 rounded-[3rem] shadow-[0_0_100px_rgba(0,0,0,0.5)] flex flex-col items-center space-y-8 animate-in zoom-in-95`}>
+              <div className={`w-20 h-20 rounded-full border-[3px] ${
+                telemetryType === 'green' ? 'border-emerald-500/20 border-t-emerald-500' : 
+                telemetryType === 'multilingual' ? 'border-blue-500/20 border-t-blue-500' : 
+                telemetryType === 'error' ? 'border-red-500/20 border-t-red-500' :
+                telemetryType === 'dataset' ? 'border-amber-500/20 border-t-amber-500' :
+                'border-violet-500/20 border-t-violet-500'} animate-spin`}></div>
               <div className="text-center space-y-2">
-                 <h4 className={`text-sm font-black uppercase tracking-[0.5em] ${telemetryType === 'green' ? 'text-emerald-400' : telemetryType === 'multilingual' ? 'text-blue-400' : 'text-violet-400'}`}>Reasoning_Kernel_Uplink</h4>
+                 <h4 className={`text-sm font-black uppercase tracking-[0.5em] ${
+                   telemetryType === 'green' ? 'text-emerald-400' : 
+                   telemetryType === 'multilingual' ? 'text-blue-400' : 
+                   telemetryType === 'error' ? 'text-red-400' :
+                   telemetryType === 'dataset' ? 'text-amber-400' :
+                   'text-violet-400'}`}>Reasoning_Kernel_Uplink</h4>
                  <p className="text-[11px] text-gray-500 font-mono animate-pulse">Establishing secure telemetry tunnel to global 2025 ground-truth nodes...</p>
               </div>
            </div>
@@ -349,7 +389,7 @@ const ModuleViewer: React.FC<{
         </div>
       )}
 
-      {telemetryType === 'quantum' && (
+      {(telemetryType === 'quantum' || telemetryType === 'qlgraph' || telemetryType === 'error') && (
         <div className="animate-in slide-in-from-bottom-12 duration-1000">
            <QuantumGraph data={{nodes: [], links: []}} />
         </div>
