@@ -3,18 +3,20 @@ export interface AgentBenchmark {
   id: string;
   name: string;
   version: string;
-  greenScore: number; // 0-100 based on energy/token
-  quantumErrorCorrection: number; // Error resilience score
-  provenanceClarity: number; // Graph lineage transparency
-  multilingualReach: number; // Benchmarking across 50+ languages
-  latency: number; // ms
-  energyPerToken: number; // microjoules/token
+  greenScore: number; 
+  quantumErrorCorrection: number; 
+  provenanceClarity: number; 
+  multilingualReach: number; 
+  latency: number; 
+  energyPerToken: number; 
+  carbonIntensity: number; // gCO2eq
+  memoryEfficiency: number; // 0-100 score
 }
 
 export interface GraphNode {
   id: string;
   label: string;
-  type: 'quantum' | 'agent' | 'error' | 'provenance';
+  type: 'quantum' | 'agent' | 'error' | 'provenance' | 'policy';
   val: number;
 }
 
@@ -43,24 +45,16 @@ export interface A2AResponse {
       energy_consumed_uj: number;
       quantum_fidelity: number;
       token_count: number;
-      carbon_intensity_g?: number;
-      latency_ms?: number;
-      accuracy_purity?: number;
+      carbon_intensity_g: number;
+      latency_ms: number;
+      memory_peak_mb: number;
     };
     metadata: {
       timestamp: string;
       agent_id: string;
     };
   };
+  policy_feedback?: string;
+  chaos_alert?: string;
   reasoning_log: string;
-  rlhf_critique?: string;
-}
-
-export enum BenchmarkModule {
-  GREEN_METRICS = 'GREEN_METRICS',
-  QUANTUM_ERR_CORRECTION = 'QUANTUM_ERR_CORRECTION',
-  QUANTUM_PROVENANCE = 'QUANTUM_PROVENANCE',
-  MULTILINGUAL_BENCH = 'MULTILINGUAL_BENCH',
-  QL_GRAPH_PROV = 'QL_GRAPH_PROV',
-  DATASET_EXPLORER = 'DATASET_EXPLORER'
 }
