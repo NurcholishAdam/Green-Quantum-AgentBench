@@ -13,8 +13,10 @@ import {
   getMultilingualTelemetry,
   getProvenanceTelemetry,
   getErrorCorrectionTelemetry,
-  getDatasetTelemetry
+  getDatasetTelemetry,
+  getGraphTelemetry
 } from './services/geminiService';
+import { QuantumGraphData } from './types';
 
 type TabType = 'dashboard' | 'quantum' | 'green' | 'multilingual' | 'qlgraph' | 'error' | 'dataset';
 
@@ -173,18 +175,43 @@ const ModuleViewer: React.FC<{
   const [insights, setInsights] = useState(initialInsights);
   const [isFetchingTelemetry, setIsFetchingTelemetry] = useState(false);
   const [telemetryLogs, setTelemetryLogs] = useState<TelemetryLog[]>([]);
+  const [graphData, setGraphData] = useState<QuantumGraphData>({
+    nodes: [
+      { id: 'n1', label: 'Inception_Root', type: 'agent', val: 90 },
+      { id: 'n2', label: 'Logic_Gate_Alpha', type: 'quantum', val: 75 },
+      { id: 'n3', label: 'Fault_Sensor', type: 'error', val: 40 },
+      { id: 'n4', label: 'Lineage_Sync', type: 'provenance', val: 88 }
+    ],
+    links: [
+      { source: 'n1', target: 'n2', weight: 15 },
+      { source: 'n2', target: 'n3', weight: 8 },
+      { source: 'n4', target: 'n1', weight: 20 }
+    ]
+  });
 
   const handleTelemetryUplink = async () => {
     setIsFetchingTelemetry(true);
     try {
       let telemetry;
+      let newGraph;
+      
       switch (telemetryType) {
         case 'green': telemetry = await getGreenTelemetry(insights); break;
-        case 'qlgraph': telemetry = await getProvenanceTelemetry(insights); break;
-        case 'error': telemetry = await getErrorCorrectionTelemetry(insights); break;
+        case 'qlgraph': 
+          telemetry = await getProvenanceTelemetry(insights); 
+          newGraph = await getGraphTelemetry('provenance');
+          break;
+        case 'error': 
+          telemetry = await getErrorCorrectionTelemetry(insights); 
+          newGraph = await getGraphTelemetry('error');
+          break;
         case 'dataset': telemetry = await getDatasetTelemetry(insights); break;
-        default: telemetry = await getQuantumTelemetry(insights); break;
+        default: 
+          telemetry = await getQuantumTelemetry(insights); 
+          newGraph = await getGraphTelemetry('quantum');
+          break;
       }
+
       if (telemetry) {
         setInsights(prev => prev.map(old => {
           const match = telemetry.find((t: any) => t.label === old.label);
@@ -193,6 +220,10 @@ const ModuleViewer: React.FC<{
           }
           return match ? { ...old, ...match } : old;
         }));
+      }
+
+      if (newGraph && newGraph.nodes.length > 0) {
+        setGraphData(newGraph);
       }
     } finally { setIsFetchingTelemetry(false); }
   };
@@ -216,6 +247,18 @@ const ModuleViewer: React.FC<{
           <p className="text-2xl text-gray-400 font-light leading-relaxed border-l-4 border-emerald-500/30 pl-10">{description}</p>
         </div>
       </div>
+
+      {(telemetryType === 'qlgraph' || telemetryType === 'quantum' || telemetryType === 'error') && (
+        <div className="animate-in slide-in-from-bottom-8 duration-700">
+           <QuantumGraph data={graphData} />
+        </div>
+      )}
+
+      {telemetryType === 'green' && (
+        <div className="animate-in slide-in-from-bottom-8 duration-700">
+           <GreenParetoChart insights={insights} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative z-10">
         {insights.map((insight, i) => (
@@ -241,7 +284,7 @@ const ModuleViewer: React.FC<{
         {showTelemetryButton && (
           <button onClick={handleTelemetryUplink} disabled={isFetchingTelemetry} className="px-20 py-8 bg-emerald-900/40 border-2 border-emerald-500/50 rounded-[3rem] text-[13px] font-black uppercase tracking-[0.4em] transition-all flex items-center gap-6">
             <i className={`fa-solid ${isFetchingTelemetry ? 'fa-spinner fa-spin' : 'fa-bolt-lightning'}`}></i>
-            UPGRADE_REALTIME_TELEMETRY
+            {isFetchingTelemetry ? 'ESTABLISHING_UPLINK...' : 'UPGRADE_REALTIME_PROVENANCE'}
           </button>
         )}
       </div>

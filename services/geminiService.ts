@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { AgentBenchmark, A2ARequest, A2AResponse } from "../types";
+import { AgentBenchmark, A2ARequest, A2AResponse, QuantumGraphData } from "../types";
 
 export interface SearchResult {
   text: string;
@@ -13,6 +13,28 @@ export interface SearchResult {
   }>;
   researchFocus?: string;
 }
+
+/**
+ * Fetches dynamic graph structure for nodes and links.
+ */
+export const getGraphTelemetry = async (type: string): Promise<QuantumGraphData> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Generate a JSON object representing a dynamic provenance graph for "${type}".
+      The object must have "nodes" (array of {id, label, type, val}) and "links" (array of {source, target, weight}).
+      Types: quantum, agent, error, provenance.
+      Include at least 6 nodes and 7 links. Ensure the data reflects "decision path stability" and "lineage drift".
+      Return ONLY valid JSON.`,
+      config: { responseMimeType: "application/json" }
+    });
+    return JSON.parse(response.text);
+  } catch (error) {
+    console.error("Graph Telemetry Error:", error);
+    return { nodes: [], links: [] };
+  }
+};
 
 /**
  * Strategy reasoning for Sustainable AI paths using Gemini 3 Pro Thinking.
