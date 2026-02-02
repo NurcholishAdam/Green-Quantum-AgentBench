@@ -1,18 +1,22 @@
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
 import { QuantumGraphData, GraphNode, GraphLink } from '../types';
 import { QUANTUM_COLORS } from '../constants';
+import { getGraphTelemetry } from '../services/geminiService';
 
 interface Props {
   data: QuantumGraphData;
+  type?: string;
+  autoRefresh?: boolean;
 }
 
-const QuantumGraph: React.FC<Props> = ({ data: externalData }) => {
+const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance', autoRefresh = true }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const [graphData, setGraphData] = useState<QuantumGraphData>(externalData);
-  const [visibleTypes, setVisibleTypes] = useState<Set<string>>(new Set(['quantum', 'agent', 'error', 'provenance']));
+  const [graphData, setGraphData] = useState<QuantumGraphData>(initialData);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [visibleTypes, setVisibleTypes] = useState<Set<string>>(new Set(['quantum', 'agent', 'error', 'provenance', 'policy']));
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
 
   const toggleType = (type: string) => {
@@ -27,33 +31,40 @@ const QuantumGraph: React.FC<Props> = ({ data: externalData }) => {
     });
   };
 
-  // Sync with external data updates
-  useEffect(() => {
-    if (externalData && externalData.nodes.length > 0) {
-      setGraphData(externalData);
+  const fetchUpdate = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      const newData = await getGraphTelemetry(type);
+      if (newData && newData.nodes.length > 0) {
+        setGraphData(newData);
+      }
+    } catch (err) {
+      console.error("Entanglement sync failed", err);
+    } finally {
+      setIsSyncing(false);
     }
-  }, [externalData]);
+  }, [type]);
 
-  // Jitter and simulation of drift
+  // Initial load and auto-refresh logic
   useEffect(() => {
-    const interval = setInterval(() => {
+    if (autoRefresh) {
+      const interval = setInterval(fetchUpdate, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [autoRefresh, fetchUpdate]);
+
+  // Local jitter for "Dynamic Entanglement" feel
+  useEffect(() => {
+    const jitterInterval = setInterval(() => {
       setGraphData(prev => ({
-        nodes: prev.nodes.map((n) => {
-          const jitter = (Math.random() - 0.5) * 5;
-          const drift = Math.random() > 0.95 ? (Math.random() - 0.5) * 20 : 0;
-          return {
-            ...n,
-            val: Math.max(5, Math.min(100, n.val + jitter + drift))
-          };
-        }),
-        links: prev.links.map(l => ({
-          ...l,
-          weight: Math.max(1, Math.min(30, l.weight + (Math.random() - 0.5) * 2))
+        ...prev,
+        nodes: prev.nodes.map(n => ({
+          ...n,
+          val: Math.max(10, Math.min(100, n.val + (Math.random() - 0.5) * 4))
         }))
       }));
-    }, 1500);
-
-    return () => clearInterval(interval);
+    }, 2000);
+    return () => clearInterval(jitterInterval);
   }, []);
 
   useEffect(() => {
@@ -74,20 +85,36 @@ const QuantumGraph: React.FC<Props> = ({ data: externalData }) => {
 
     if (!simulationRef.current) {
       svg.selectAll("*").remove();
+      // Add defs for glows
+      const defs = svg.append("defs");
+      Object.entries(QUANTUM_COLORS).forEach(([key, color]) => {
+        const filter = defs.append("filter").attr("id", `glow-${key}`);
+        filter.append("feGaussianBlur").attr("stdDeviation", "3.5").attr("result", "coloredBlur");
+        const feMerge = filter.append("feMerge");
+        feMerge.append("feMergeNode").attr("in", "coloredBlur");
+        feMerge.append("feMergeNode").attr("in", "SourceGraphic");
+      });
+
       svg.append("g").attr("class", "links");
       svg.append("g").attr("class", "nodes");
 
       simulationRef.current = d3.forceSimulation()
-        .force("link", d3.forceLink().id((d: any) => d.id).distance(140))
-        .force("charge", d3.forceManyBody().strength(-400))
+        .force("link", d3.forceLink().id((d: any) => d.id).distance(120))
+        .force("charge", d3.forceManyBody().strength(-300))
         .force("center", d3.forceCenter(width / 2, height / 2))
-        .force("collision", d3.forceCollide().radius(40));
+        .force("collision", d3.forceCollide().radius(50));
     }
 
     const sim = simulationRef.current;
+    
+    // Smoothly transition existing nodes or add new ones
+    const currentNodes = sim.nodes();
     const nodes = filteredNodes.map(d => {
-      const existing = sim.nodes().find(n => n.id === d.id);
-      return existing ? { ...existing, ...d } : { ...d };
+      const existing = currentNodes.find(n => n.id === d.id);
+      if (existing) {
+        return Object.assign(existing, d);
+      }
+      return { ...d, x: width / 2, y: height / 2 };
     });
 
     const links = filteredLinks.map(d => ({
@@ -99,23 +126,36 @@ const QuantumGraph: React.FC<Props> = ({ data: externalData }) => {
     sim.nodes(nodes);
     (sim.force("link") as d3.ForceLink<any, any>).links(links);
 
-    svg.select(".links")
+    const linkElements = svg.select(".links")
       .selectAll("line")
       .data(links, (d: any) => `${d.source.id}-${d.target.id}`)
-      .join("line")
-      .attr("stroke", (d: any) => d.weight > 20 ? "#10b981" : "#333") // Green highlight for stable paths
-      .attr("stroke-opacity", (d: any) => Math.min(1, 0.2 + (d.weight / 30)))
-      .attr("stroke-width", (d: any) => 1 + (d.weight / 5))
-      .attr("stroke-dasharray", (d: any) => d.weight < 5 ? "4 4" : "none"); // Dash for unstable/low-weight links
+      .join(
+        enter => enter.append("line")
+          .attr("stroke-width", 0)
+          .attr("stroke-opacity", 0)
+          .transition().duration(500)
+          .attr("stroke-opacity", (d: any) => Math.min(0.6, 0.1 + (d.weight / 20)))
+          .attr("stroke-width", (d: any) => 1 + (d.weight / 6))
+          .selection(),
+        update => update
+          .transition().duration(500)
+          .attr("stroke-width", (d: any) => 1 + (d.weight / 6))
+          .attr("stroke-opacity", (d: any) => Math.min(0.6, 0.1 + (d.weight / 20)))
+          .selection(),
+        exit => exit.transition().duration(500).attr("stroke-width", 0).remove()
+      )
+      .attr("stroke", (d: any) => d.weight > 15 ? "#10b981" : "#444")
+      .attr("stroke-dasharray", (d: any) => d.weight < 5 ? "5,5" : "none");
 
-    svg.select(".nodes")
+    const nodeElements = svg.select(".nodes")
       .selectAll("circle")
       .data(nodes, (d: any) => d.id)
       .join(
         enter => enter.append("circle")
           .attr("r", 0)
           .attr("stroke", "#fff")
-          .attr("stroke-width", 1.5)
+          .attr("stroke-width", 1)
+          .attr("opacity", 0)
           .call(d3.drag<any, any>()
             .on("start", (event, d) => {
               if (!event.active) sim.alphaTarget(0.3).restart();
@@ -128,31 +168,34 @@ const QuantumGraph: React.FC<Props> = ({ data: externalData }) => {
               if (!event.active) sim.alphaTarget(0);
               d.fx = null; d.fy = null;
             }) as any
-          ),
-        update => update,
-        exit => exit.remove()
+          )
+          .transition().duration(800)
+          .attr("r", (d: any) => 12 + (d.val / 8))
+          .attr("opacity", 1)
+          .selection(),
+        update => update
+          .transition().duration(800)
+          .attr("r", (d: any) => 12 + (d.val / 8))
+          .selection(),
+        exit => exit.transition().duration(500).attr("r", 0).remove()
       )
       .on("mouseover", (event, d: any) => {
         tooltip.transition().duration(200).style("opacity", 1);
         tooltip.html(`
-          <div class="space-y-2 min-w-[200px]">
+          <div class="space-y-2 min-w-[220px]">
             <div class="flex items-center justify-between border-b border-white/10 pb-2 mb-1">
               <span class="text-[9px] uppercase font-black tracking-[0.2em] text-gray-500 font-mono">${d.type}_node</span>
-              <span class="text-[8px] font-mono text-white/30">#${d.id}</span>
+              <span class="text-[8px] font-mono text-white/30 italic">ENTANGLEMENT_ID_${d.id}</span>
             </div>
-            <div class="text-[15px] font-black text-white tracking-tight leading-tight">${d.label}</div>
-            <div class="pt-2 space-y-2">
+            <div class="text-[16px] font-black text-white tracking-tight leading-tight">${d.label}</div>
+            <div class="pt-2 space-y-3">
               <div class="flex items-center justify-between">
-                <span class="text-[9px] text-gray-600 uppercase font-black">Fidelity_Signal</span>
-                <span class="text-[12px] font-mono font-bold" style="color: ${QUANTUM_COLORS[d.type as keyof typeof QUANTUM_COLORS]}">${d.val.toFixed(2)}%</span>
+                <span class="text-[9px] text-gray-600 uppercase font-black">Coherence_Flux</span>
+                <span class="text-[13px] font-mono font-bold" style="color: ${QUANTUM_COLORS[d.type as keyof typeof QUANTUM_COLORS]}">${d.val.toFixed(2)}%</span>
               </div>
               <div class="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                 <div class="h-full transition-all duration-700" style="width: ${d.val}%; background-color: ${QUANTUM_COLORS[d.type as keyof typeof QUANTUM_COLORS]}"></div>
+                 <div class="h-full transition-all duration-1000" style="width: ${d.val}%; background-color: ${QUANTUM_COLORS[d.type as keyof typeof QUANTUM_COLORS]}"></div>
               </div>
-            </div>
-            <div class="pt-1 flex items-center gap-2 text-[8px] font-mono ${d.val > 80 ? 'text-emerald-500/60' : 'text-amber-500/60'}">
-               <i class="fa-solid fa-check-circle"></i>
-               <span>Lineage Integrity: ${d.val > 90 ? 'OPTIMAL' : d.val > 70 ? 'STABLE' : 'DRIFTING'}</span>
             </div>
           </div>
         `);
@@ -164,62 +207,78 @@ const QuantumGraph: React.FC<Props> = ({ data: externalData }) => {
         tooltip.transition().duration(500).style("opacity", 0);
       })
       .attr("fill", (d: any) => QUANTUM_COLORS[d.type as keyof typeof QUANTUM_COLORS])
-      .transition()
-      .duration(300)
-      .attr("r", (d: any) => 10 + (d.val / 6))
-      .attr("filter", (d: any) => d.val > 85 ? `drop-shadow(0 0 12px ${QUANTUM_COLORS[d.type as keyof typeof QUANTUM_COLORS]}aa)` : "none");
+      .attr("filter", (d: any) => d.val > 70 ? `url(#glow-${d.type})` : "none");
 
     sim.on("tick", () => {
-      svg.selectAll("line")
+      linkElements
         .attr("x1", (d: any) => d.source.x)
         .attr("y1", (d: any) => d.source.y)
         .attr("x2", (d: any) => d.target.x)
         .attr("y2", (d: any) => d.target.y);
 
-      svg.selectAll("circle")
+      nodeElements
         .attr("cx", (d: any) => d.x)
         .attr("cy", (d: any) => d.y);
     });
 
-    sim.alpha(0.2).restart();
+    sim.alpha(0.1).restart();
   }, [graphData, visibleTypes]);
 
   return (
-    <div className="relative w-full bg-[#0d0d0d] border border-white/5 rounded-[2.5rem] overflow-hidden h-[450px] shadow-2xl flex flex-col">
-      <div ref={tooltipRef} className="pointer-events-none fixed z-[9999] opacity-0 bg-black/95 backdrop-blur-2xl border border-white/10 p-5 rounded-3xl shadow-[0_30px_60px_rgba(0,0,0,0.8)] transition-opacity" />
+    <div className="relative w-full bg-[#0d0d0d] border border-white/5 rounded-[3rem] overflow-hidden h-[500px] shadow-[0_40px_100px_rgba(0,0,0,0.6)] flex flex-col group">
+      <div ref={tooltipRef} className="pointer-events-none fixed z-[9999] opacity-0 bg-black/90 backdrop-blur-3xl border border-white/10 p-6 rounded-[2rem] shadow-2xl transition-opacity duration-300" />
       
-      <div className="absolute top-8 left-10 z-10 flex flex-col gap-1">
-        <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.5em] font-mono">Quantum_Provenance_Engine</h3>
-        <div className="flex items-center gap-3">
-           <div className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
-           <span className="text-[9px] font-mono text-emerald-500/60 uppercase tracking-widest">Live_Lineage_Trace_Active</span>
+      <div className="absolute top-10 left-12 z-10 space-y-2">
+        <div className="flex items-center gap-4">
+           <div className={`w-3 h-3 rounded-full ${isSyncing ? 'bg-amber-500 animate-ping' : 'bg-emerald-500'} shadow-lg shadow-emerald-500/20`}></div>
+           <h3 className="text-[11px] font-black text-white uppercase tracking-[0.5em] font-mono">Quantum_Entanglement_Visualizer</h3>
         </div>
+        <p className="text-[9px] font-mono text-gray-600 uppercase tracking-widest pl-7">
+          {isSyncing ? 'Synchronizing Semantic Lineage...' : 'Monitoring Real-time Provenance Drift'}
+        </p>
       </div>
 
-      <div className="absolute top-8 right-10 z-10 flex gap-2">
+      <div className="absolute top-10 right-12 z-10 flex items-center gap-2 bg-black/40 backdrop-blur-md p-1.5 rounded-2xl border border-white/5">
         {(Object.keys(QUANTUM_COLORS) as Array<keyof typeof QUANTUM_COLORS>).map(type => (
           <button
             key={type}
             onClick={() => toggleType(type)}
-            className={`px-4 py-1.5 rounded-2xl text-[9px] font-black uppercase tracking-[0.1em] border transition-all ${
-              visibleTypes.has(type) ? 'bg-white/5 border-white/20 text-white' : 'border-transparent text-gray-700'
+            className={`px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest border transition-all ${
+              visibleTypes.has(type) ? 'bg-white/5 border-white/10 text-white' : 'border-transparent text-gray-800'
             }`}
             style={{ color: visibleTypes.has(type) ? QUANTUM_COLORS[type] : '' }}
           >
             {type}
           </button>
         ))}
+        <div className="w-px h-4 bg-white/10 mx-1"></div>
+        <button 
+          onClick={fetchUpdate}
+          disabled={isSyncing}
+          className="w-8 h-8 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 flex items-center justify-center transition-all active:scale-90"
+          title="Manual Sync"
+        >
+          <i className={`fa-solid fa-sync ${isSyncing ? 'fa-spin' : ''}`}></i>
+        </button>
       </div>
 
-      <div className="absolute bottom-8 left-10 z-10 flex flex-col gap-2">
-        <div className="flex items-center gap-3 text-[8px] font-mono text-gray-600">
-           <div className="w-8 h-0.5 bg-emerald-500"></div>
-           <span>STABLE_DECISION_PATH</span>
+      <div className="absolute bottom-10 left-12 z-10 space-y-3">
+        <div className="flex items-center gap-4 group/legend">
+           <div className="w-12 h-[2px] bg-gradient-to-r from-emerald-500 to-emerald-500/10"></div>
+           <span className="text-[8px] font-black text-gray-600 uppercase tracking-[0.2em] group-hover/legend:text-emerald-500/60 transition-colors">Stable_Lineage_Fork</span>
         </div>
-        <div className="flex items-center gap-3 text-[8px] font-mono text-gray-600">
-           <div className="w-8 h-0.5 bg-gray-700 border-t border-dashed border-gray-500"></div>
-           <span>PATH_UNCERTAINTY_DRIFT</span>
+        <div className="flex items-center gap-4 group/legend">
+           <div className="w-12 h-[2px] border-t border-dashed border-gray-600"></div>
+           <span className="text-[8px] font-black text-gray-600 uppercase tracking-[0.2em] group-hover/legend:text-gray-400/60 transition-colors">Stochastic_Drift_Path</span>
         </div>
+      </div>
+
+      <div className="absolute bottom-10 right-12 z-10 pointer-events-none opacity-40">
+         <div className="text-[10px] font-mono text-gray-700 text-right">
+            NODES: {graphData.nodes.length}<br/>
+            EDGES: {graphData.links.length}<br/>
+            FIDELITY: {(graphData.nodes.reduce((acc, n) => acc + n.val, 0) / graphData.nodes.length || 0).toFixed(1)}%
+         </div>
       </div>
 
       <svg ref={svgRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
