@@ -6,14 +6,19 @@ import {
 import { MOCK_AGENTS, QUANTUM_COLORS } from '../constants';
 import { AgentBenchmark, QuantumGraphData, A2ARequest, A2AResponse } from '../types';
 import QuantumGraph from './QuantumGraph';
-import { generateAgentBeatsProposal, analyzeQuantumProvenance, searchGreenStandards, SearchResult, processA2ATask } from '../services/geminiService';
+import { 
+  generateAgentBeatsProposal, 
+  analyzeQuantumProvenance, 
+  searchGreenStandards, 
+  SearchResult, 
+  processA2ATask,
+  strategicSustainabilityAudit
+} from '../services/geminiService';
 
-// Helper to safely render content that might be an object (Fixes React Error 31)
 const SafeContent: React.FC<{ content: any; className?: string }> = ({ content, className }) => {
   if (content === null || content === undefined) return null;
   if (typeof content === 'string') return <span className={className}>{content}</span>;
   if (typeof content === 'number' || typeof content === 'boolean') return <span className={className}>{content.toString()}</span>;
-  
   return (
     <div className={`p-2 bg-black/20 rounded border border-white/5 font-mono text-[9px] ${className}`}>
       {JSON.stringify(content, null, 2)}
@@ -27,48 +32,45 @@ const Dashboard: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isProcessingA2A, setIsProcessingA2A] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult | null>(null);
   const [report, setReport] = useState<string | null>(null);
   const [a2aResponse, setA2aResponse] = useState<A2AResponse | null>(null);
+  const [strategicAdvice, setStrategicAdvice] = useState<string | null>(null);
   const [a2aInstruction, setA2aInstruction] = useState('Optimize Pareto frontier for accuracy vs. carbon footprint in quantum-limit clusters.');
   
-  // Feedback Loop States
-  const [userFeedback, setUserFeedback] = useState('');
   const [feedbackLogs, setFeedbackLogs] = useState<{ id: string; text: string; timestamp: string; taskId: string }[]>([]);
-  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
-  const [showFeedbackSuccess, setShowFeedbackSuccess] = useState(false);
-
-  const feedbackRef = useRef<HTMLDivElement>(null);
-
-  const [analysisResult, setAnalysisResult] = useState<{
-    anomalies: string[];
-    correctionPath: string;
-    confidenceScore: number;
-  } | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
 
   const selectedAgent = useMemo(() => 
     MOCK_AGENTS.find(a => a.id === selectedAgentId) || MOCK_AGENTS[0], 
   [selectedAgentId]);
 
-  // Mechanism to fetch latest 2025 benchmarks on mount and via button
   const triggerBenchmarkSync = async (queryOverride?: string) => {
     setIsSearching(true);
-    const query = queryOverride || "Latest 2025 industry benchmarks for Green AI (energy/carbon) and Quantum Computing multi-objective evaluation (accuracy, latency)";
+    const query = queryOverride || "Latest 2025 industry benchmarks for Green AI and Sustainable Computing.";
     try {
       const result = await searchGreenStandards(query);
       setSearchResults(result);
-    } catch (e) {
-      console.error("Benchmark sync failed", e);
     } finally {
       setIsSearching(false);
     }
   };
 
-  useEffect(() => {
-    triggerBenchmarkSync();
-  }, []);
+  const handleStrategicThink = async () => {
+    setIsThinking(true);
+    setStrategicAdvice(null);
+    try {
+      const advice = await strategicSustainabilityAudit(selectedAgent, a2aInstruction);
+      setStrategicAdvice(advice);
+    } finally {
+      setIsThinking(false);
+    }
+  };
+
+  useEffect(() => { triggerBenchmarkSync(); }, []);
 
   const radarData = useMemo(() => [
     { subject: 'Accuracy', A: selectedAgent.greenScore, fullMark: 100 },
@@ -98,115 +100,21 @@ const Dashboard: React.FC = () => {
     ]
   }), []);
 
-  const handleGenerateReport = async () => {
-    setIsGenerating(true);
-    try {
-      const res = await generateAgentBeatsProposal(selectedAgent);
-      setReport(res || "Generation failed.");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleRunA2ASimulation = async () => {
-    setIsProcessingA2A(true);
-    setA2aResponse(null);
-    setShowFeedbackSuccess(false);
-    const request: A2ARequest = {
-      task_id: `PARETO-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-      instruction: a2aInstruction,
-      constraints: ["ISO-42001 Sustainability", "Pareto Frontier Alignment", "Latency Bound < 150ms"]
-    };
-    try {
-      const result = await processA2ATask(request, selectedAgent);
-      setA2aResponse(result);
-      setTimeout(() => {
-        feedbackRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 500);
-    } finally {
-      setIsProcessingA2A(false);
-    }
-  };
-
-  const handleFeedbackSubmit = () => {
-    if (!userFeedback.trim() || !a2aResponse) return;
-    setIsSubmittingFeedback(true);
-    
-    const newLog = {
-      id: Math.random().toString(36).substr(2, 9),
-      text: userFeedback,
-      timestamp: new Date().toLocaleTimeString(),
-      taskId: a2aResponse.payload.metadata.timestamp 
-    };
-
-    setTimeout(() => {
-      setFeedbackLogs(prev => [newLog, ...prev]);
-      setUserFeedback('');
-      setIsSubmittingFeedback(false);
-      setShowFeedbackSuccess(true);
-      setTimeout(() => setShowFeedbackSuccess(false), 3000);
-    }, 600);
-  };
-
-  const handleAnalyzeProvenance = async () => {
-    setIsAnalyzing(true);
-    setAnalysisResult(null);
-    const mockLogs = `
-      [TIMESTAMP: ${new Date().toISOString()}] AGENT: ${selectedAgent.name}
-      [PROVENANCE] TRACE: node_a1 -> node_q1 -> node_e1
-      [SIGNAL] COHERENCE_LEVEL: 0.941
-      [ERROR] SYNDROME_DETECTED: PHASE_FLIP_RECURSION_002
-      [STATE] ENTROPY_VAL: 0.042
-      [STATE] QEC_OVERHEAD: 12%
-    `;
-    try {
-      const result = await analyzeQuantumProvenance(mockLogs);
-      // Ensure result matches the expected structure
-      setAnalysisResult({
-        anomalies: Array.isArray(result.anomalies) ? result.anomalies : ["High Entropy Cluster Detected"],
-        correctionPath: result.correctionPath || "Recalibrate gate fidelity thresholds.",
-        confidenceScore: typeof result.confidenceScore === 'number' ? result.confidenceScore : 0.88
-      });
-    } catch (e) {
-      console.error(e);
-      setAnalysisResult({
-        anomalies: ["Fidelity degradation detected in Q-Kernel"],
-        correctionPath: "Initiate phase-flip correction protocol d=7.",
-        confidenceScore: 0.92
-      });
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  const handleSearchStandards = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-    triggerBenchmarkSync(searchQuery);
-  };
-
   return (
-    <div className="p-4 md:p-8 space-y-8 animate-in fade-in duration-1000">
+    <div className="p-4 md:p-8 space-y-8 animate-in fade-in duration-1000 pb-24">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-[9px] font-bold border border-emerald-500/20 rounded uppercase tracking-tighter flex items-center gap-1">
-              <i className="fa-solid fa-scale-balanced"></i> Pareto Optimized
-            </span>
-            <span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[9px] font-bold border border-blue-500/20 rounded uppercase tracking-tighter flex items-center gap-1">
-              <i className="fa-solid fa-leaf"></i> Carbon Aligned
-            </span>
-            <span className="px-2 py-0.5 bg-violet-500/10 text-violet-400 text-[9px] font-bold border border-violet-500/20 rounded uppercase tracking-tighter flex items-center gap-1">
-              <i className="fa-solid fa-bolt-lightning"></i> Low-Latency Kernel
+              <i className="fa-solid fa-leaf"></i> GREEN_AGENT ARCHITECTURE
             </span>
           </div>
           <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-violet-500">
-            Multi-Objective AgentBench
+            Multi-Objective Sustainable Bench
           </h1>
-          <p className="text-gray-400 text-sm max-w-2xl font-light leading-relaxed">
-            Evaluating agents across the 4-vector optimization space: <span className="text-white font-medium">Accuracy, Energy, Carbon, and Latency.</span> 
-            Utilizing high-reasoning Gemini 3 for A2A-standard payload synthesis.
+          <p className="text-gray-400 text-sm max-w-2xl font-light">
+            Integrating 2025 Green AI protocols with Quantum Fidelity benchmarks.
           </p>
         </div>
         
@@ -215,10 +123,10 @@ const Dashboard: React.FC = () => {
             <button
               key={agent.id}
               onClick={() => setSelectedAgentId(agent.id)}
-              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all duration-300 ${
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
                 selectedAgentId === agent.id 
-                  ? 'bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)] scale-105' 
-                  : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
+                  ? 'bg-emerald-500 text-white shadow-lg scale-105' 
+                  : 'text-gray-500 hover:text-gray-300'
               }`}
             >
               {agent.name}
@@ -228,444 +136,141 @@ const Dashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Section */}
+        {/* Profile & Metrics */}
         <div className="lg:col-span-3 space-y-6">
           <div className="bg-[#111] border border-white/5 p-6 rounded-2xl shadow-xl">
-             <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-6 flex items-center gap-2">
-               <i className="fa-solid fa-compass text-emerald-500"></i> Multi-Objective Profile
-             </h3>
+             <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-6">Sustainability Radar</h3>
              <ResponsiveContainer width="100%" height={240}>
                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
                   <PolarGrid stroke="#222" />
                   <PolarAngleAxis dataKey="subject" tick={{ fill: '#666', fontSize: 8 }} />
-                  <Radar
-                    name={selectedAgent.name}
-                    dataKey="A"
-                    stroke="#10b981"
-                    fill="#10b981"
-                    fillOpacity={0.15}
-                  />
-                  <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #333', fontSize: '10px' }} />
+                  <Radar name={selectedAgent.name} dataKey="A" stroke="#10b981" fill="#10b981" fillOpacity={0.15} />
                </RadarChart>
              </ResponsiveContainer>
           </div>
 
           <div className="bg-[#111] border border-white/5 p-6 rounded-2xl space-y-4">
-            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-              <i className="fa-solid fa-microchip text-violet-500"></i> Objective Metrics
-            </h3>
-            <MetricItem label="Accuracy Index" val={`${selectedAgent.greenScore}%`} color="emerald" />
-            <MetricItem label="Latency Bounds" val={`${selectedAgent.latency}ms`} color="violet" />
+            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Core Efficiency</h3>
+            <MetricItem label="Grid Purity" val={`${selectedAgent.greenScore}%`} color="emerald" />
+            <MetricItem label="PUE Ratio" val="1.08" color="violet" />
             <MetricItem label="Carbon Trace" val={`${selectedAgent.provenanceClarity}%`} color="blue" />
-            <MetricItem label="Energy Cost" val={`${selectedAgent.energyPerToken}μJ`} color="amber" />
-          </div>
-          
-          <div className="bg-[#111] border border-white/5 p-6 rounded-2xl h-[340px] flex flex-col">
-            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <i className="fa-solid fa-clock-rotate-left text-amber-500"></i> Research Logs
-            </h3>
-            <div className="flex-grow overflow-y-auto space-y-3 pr-1 custom-scrollbar border-t border-white/5 pt-4">
-              {feedbackLogs.length > 0 ? (
-                feedbackLogs.map((log) => (
-                  <div key={log.id} className="bg-white/5 p-2.5 rounded-lg border border-white/5 text-[10px] animate-in slide-in-from-left-2">
-                    <div className="flex justify-between mb-1">
-                      <span className="text-amber-500/80 font-bold uppercase tracking-tighter">RLHF_SYNC</span>
-                      <span className="text-gray-600 font-mono">{log.timestamp}</span>
-                    </div>
-                    <p className="text-gray-400 italic leading-relaxed">"{log.text}"</p>
-                  </div>
-                ))
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-center opacity-20 px-4">
-                  <i className="fa-solid fa-inbox text-2xl mb-2"></i>
-                  <p className="text-[9px] uppercase font-bold tracking-widest leading-relaxed">Awaiting Payload Refinement</p>
-                </div>
-              )}
-            </div>
+            <MetricItem label="Energy/T" val={`${selectedAgent.energyPerToken}μJ`} color="amber" />
           </div>
         </div>
 
-        {/* Center Section */}
+        {/* Execution & Thinking Sandbox */}
         <div className="lg:col-span-6 space-y-6">
-          <div className="bg-[#111] border border-white/5 p-6 rounded-2xl shadow-2xl relative group overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-              <i className="fa-solid fa-earth-americas text-6xl text-blue-500"></i>
-            </div>
+          <div className="bg-[#111] border border-white/5 p-6 rounded-2xl relative shadow-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs font-bold text-gray-300 uppercase tracking-widest flex items-center gap-2">
-                <i className="fa-brands fa-google text-blue-400"></i>
-                <span>Industry Benchmark Feed (2025)</span>
-              </h3>
+              <h3 className="text-xs font-bold text-gray-300 uppercase tracking-widest">A2A_SUSTAINABILITY_LEDGER</h3>
               <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => triggerBenchmarkSync()}
-                  className="text-[8px] font-bold text-blue-400/80 hover:text-blue-300 bg-blue-400/10 px-2 py-1 rounded-full border border-blue-400/20 transition-all"
-                >
-                  <i className="fa-solid fa-rotate mr-1"></i> SYNC 2025
-                </button>
-                <div className="flex items-center gap-1 text-[8px] font-bold text-blue-400/60 bg-blue-400/10 px-2 py-0.5 rounded-full border border-blue-400/20">
-                  <div className="w-1 h-1 rounded-full bg-blue-400 animate-pulse"></div>
-                  LIVE_GROUNDING
-                </div>
+                 <button onClick={handleStrategicThink} disabled={isThinking} className="bg-violet-600/20 hover:bg-violet-600/40 text-violet-400 border border-violet-500/30 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all flex items-center gap-2">
+                    {isThinking ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-brain"></i>}
+                    STRATEGIC_ALIGNMENT
+                 </button>
               </div>
             </div>
-            
-            <form onSubmit={handleSearchStandards} className="relative mb-6">
-              <input 
-                type="text" 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50 transition-all text-gray-200"
-                placeholder="Query global 2025 Pareto benchmarks..."
-              />
-              <button 
-                type="submit"
-                disabled={isSearching} 
-                className="absolute right-2 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all disabled:opacity-50"
-              >
-                {isSearching ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-magnifying-glass"></i>}
-              </button>
-            </form>
-
-            <div className="h-44 overflow-y-auto space-y-4 pr-2 custom-scrollbar border-t border-white/5 pt-4">
-              {searchResults ? (
-                <div className="animate-in fade-in slide-in-from-bottom-2">
-                  <p className="text-xs text-gray-400 leading-relaxed font-light mb-4">{searchResults.text}</p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {searchResults.sources.map((src, i) => (
-                      <a key={i} href={src.uri} target="_blank" className="text-[9px] text-blue-400 bg-blue-500/5 p-2 rounded-lg border border-blue-500/10 truncate hover:border-blue-500/30 transition-all">
-                        <i className="fa-solid fa-link mr-1"></i> {src.title || src.uri}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-gray-700 opacity-40 italic">
-                  <p className="text-[10px]">Syncing latest 2025 multi-objective research...</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-[#111] border border-white/5 p-6 rounded-2xl relative shadow-2xl">
-            <h3 className="text-xs font-bold text-gray-300 uppercase tracking-widest flex items-center gap-2 mb-4">
-              <i className="fa-solid fa-terminal text-emerald-500"></i>
-              <span>Execution Sandbox</span>
-            </h3>
             
             <div className="space-y-4">
               <div className="relative">
                 <textarea 
                   value={a2aInstruction}
                   onChange={(e) => setA2aInstruction(e.target.value)}
-                  className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-[11px] text-emerald-500/80 font-mono h-20 outline-none transition-all"
-                  placeholder="Inject multi-objective task instruction..."
+                  className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-[11px] text-emerald-500/80 font-mono h-24 outline-none transition-all"
+                  placeholder="Inject Green Handshake instruction..."
                 />
                 <button 
-                  onClick={handleRunA2ASimulation}
+                  onClick={async () => {
+                    setIsProcessingA2A(true);
+                    try {
+                      const res = await processA2ATask({task_id: "T-1", instruction: a2aInstruction, constraints: []}, selectedAgent);
+                      setA2aResponse(res);
+                    } finally { setIsProcessingA2A(false); }
+                  }}
                   disabled={isProcessingA2A}
-                  className="absolute bottom-3 right-3 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all shadow-lg"
+                  className="absolute bottom-3 right-3 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-[10px] font-bold shadow-lg"
                 >
-                  {isProcessingA2A ? 'PROVISIONING...' : 'RUN_PARETO'}
+                  {isProcessingA2A ? 'AUDITING...' : 'RUN_AUDIT'}
                 </button>
               </div>
 
-              {a2aResponse && (
-                <div className="space-y-4 animate-in zoom-in-95">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-black/80 rounded-xl p-4 border border-emerald-500/20">
-                      <span className="text-[9px] font-bold text-emerald-400 block mb-2">METRIC_EXTRACTION</span>
-                      <div className="grid grid-cols-2 gap-2 mb-4">
-                         <div className="bg-white/5 p-2 rounded">
-                            <p className="text-[8px] text-gray-500 uppercase">Carbon</p>
-                            <p className="text-xs text-blue-400 font-mono">{(a2aResponse.payload.metrics as any).carbon_intensity_g || '0.04'}g</p>
-                         </div>
-                         <div className="bg-white/5 p-2 rounded">
-                            <p className="text-[8px] text-gray-500 uppercase">Latency</p>
-                            <p className="text-xs text-violet-400 font-mono">{(a2aResponse.payload.metrics as any).latency_ms || '45'}ms</p>
-                         </div>
-                      </div>
-                      <pre className="text-[10px] text-emerald-500/90 overflow-x-auto h-20 custom-scrollbar">
-                        {JSON.stringify(a2aResponse.payload, null, 2)}
-                      </pre>
-                    </div>
-                    <div className="bg-[#0c0c0c] p-4 rounded-xl border border-white/5 flex flex-col justify-between">
-                      <div>
-                        <h4 className="text-[9px] text-gray-500 font-bold uppercase mb-2">Internal Reasoning</h4>
-                        <p className="text-[10px] text-gray-400 leading-relaxed font-light italic">
-                          <SafeContent content={a2aResponse.reasoning_log} />
-                        </p>
-                      </div>
-                      <div className="pt-3 border-t border-white/5 mt-3">
-                        <h4 className="text-[9px] text-violet-400 font-bold uppercase mb-1">Pareto Frontier Critique</h4>
-                        <p className="text-[10px] text-gray-500 font-light">
-                          <SafeContent content={a2aResponse.rlhf_critique} />
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+              {strategicAdvice && (
+                <div className="bg-violet-900/10 border border-violet-500/20 p-6 rounded-2xl animate-in slide-in-from-top-4 duration-500">
+                   <div className="flex items-center gap-3 mb-4">
+                      <i className="fa-solid fa-wand-magic-sparkles text-violet-400"></i>
+                      <h4 className="text-[10px] font-black text-violet-300 uppercase tracking-widest">High-Reasoning Sustainable Path</h4>
+                   </div>
+                   <div className="text-[11px] text-gray-400 leading-relaxed italic prose prose-invert prose-sm max-w-none">
+                      {strategicAdvice}
+                   </div>
+                </div>
+              )}
 
-                  <div ref={feedbackRef} className="bg-violet-500/5 border border-violet-500/20 rounded-xl p-5 shadow-lg">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-violet-500/20 flex items-center justify-center text-violet-400">
-                          <i className="fa-solid fa-user-gear"></i>
-                        </div>
-                        <h4 className="text-xs font-bold text-violet-300">Human-In-The-Loop Refinement</h4>
+              {a2aResponse && (
+                <div className="grid grid-cols-2 gap-4 animate-in zoom-in-95">
+                    <div className="bg-black/80 rounded-xl p-4 border border-emerald-500/20">
+                      <span className="text-[9px] font-bold text-emerald-400 block mb-2 uppercase">Extraction_Metrics</span>
+                      <div className="space-y-2">
+                         <div className="flex justify-between text-[10px] font-mono">
+                            <span className="text-gray-500">CARBON:</span>
+                            <span className="text-blue-400">{a2aResponse.payload.metrics.carbon_intensity_g || 0.04}g</span>
+                         </div>
+                         <div className="flex justify-between text-[10px] font-mono">
+                            <span className="text-gray-500">ENERGY:</span>
+                            <span className="text-amber-400">{a2aResponse.payload.metrics.energy_consumed_uj}μJ</span>
+                         </div>
                       </div>
-                      {showFeedbackSuccess && (
-                        <div className="text-[9px] text-emerald-400 font-bold animate-pulse">
-                          REF_LOGGED_SUCCESSFULLY
-                        </div>
-                      )}
                     </div>
-                    <div className="flex gap-2">
-                      <input 
-                        type="text"
-                        value={userFeedback}
-                        onChange={(e) => setUserFeedback(e.target.value)}
-                        placeholder="Refine the objective weights..."
-                        className="flex-grow bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-xs focus:ring-1 focus:ring-violet-500/40 outline-none"
-                        onKeyDown={(e) => e.key === 'Enter' && handleFeedbackSubmit()}
-                      />
-                      <button 
-                        onClick={handleFeedbackSubmit}
-                        disabled={isSubmittingFeedback || !userFeedback.trim()}
-                        className="bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-lg text-[10px] font-bold"
-                      >
-                        LOG_RLHF
-                      </button>
+                    <div className="bg-[#0c0c0c] p-4 rounded-xl border border-white/5 overflow-y-auto max-h-40 custom-scrollbar">
+                      <h4 className="text-[9px] text-gray-500 font-bold uppercase mb-2">Audit Reasoning</h4>
+                      <p className="text-[10px] text-gray-400 italic">
+                        <SafeContent content={a2aResponse.reasoning_log} />
+                      </p>
                     </div>
-                  </div>
                 </div>
               )}
             </div>
           </div>
           
-          <div className="relative">
-            <QuantumGraph data={graphData} />
-            <button 
-              onClick={handleAnalyzeProvenance}
-              disabled={isAnalyzing}
-              className="absolute top-4 right-4 bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-lg text-[10px] font-bold shadow-lg flex items-center gap-2 z-20"
-            >
-              {isAnalyzing ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-stethoscope"></i>}
-              PROVENANCE_AUDIT
-            </button>
-
-            {analysisResult && (
-              <div className="mt-4 bg-black/80 border border-violet-500/20 rounded-2xl p-6 shadow-2xl animate-in slide-in-from-bottom-4 duration-500">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400">
-                      <i className="fa-solid fa-shield-virus"></i>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-white uppercase tracking-wider">Audit Intelligence Report</h4>
-                      <p className="text-[9px] text-gray-500 font-mono">Q-PROVENANCE_ANALYSIS_V2.1</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-[9px] text-gray-600 uppercase font-black tracking-widest mb-1">Confidence</div>
-                    <div className="text-lg font-mono font-bold text-violet-400">{(analysisResult.confidenceScore * 100).toFixed(1)}%</div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <h5 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] border-l-2 border-red-500/40 pl-3">Detected Anomalies</h5>
-                    <div className="space-y-2">
-                      {analysisResult.anomalies.map((anomaly, idx) => (
-                        <div key={idx} className="bg-red-500/5 border border-red-500/10 p-3 rounded-xl flex items-start gap-3">
-                          <i className="fa-solid fa-triangle-exclamation text-red-400 text-[10px] mt-1"></i>
-                          <p className="text-[11px] text-gray-400 font-light leading-relaxed">{anomaly}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <h5 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] border-l-2 border-emerald-500/40 pl-3">Correction Strategy</h5>
-                    <div className="bg-emerald-500/5 border border-emerald-500/10 p-4 rounded-xl h-full">
-                      <p className="text-[11px] text-gray-300 font-mono italic leading-relaxed">
-                        {analysisResult.correctionPath}
-                      </p>
-                      <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-3">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                        <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Protocol_Ready</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <QuantumGraph data={graphData} />
         </div>
 
-        {/* Right Section */}
+        {/* Industry Grounding */}
         <div className="lg:col-span-3 space-y-6">
-          <div className="bg-[#111] border border-white/5 p-6 rounded-2xl shadow-xl space-y-4">
-            <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-2">
-              <i className="fa-solid fa-paper-plane"></i> Final Submission
-            </h3>
-            <button 
-              onClick={handleGenerateReport} 
-              disabled={isGenerating}
-              className="w-full bg-gradient-to-r from-emerald-600 to-violet-600 hover:from-emerald-500 hover:to-violet-500 text-white py-3 rounded-xl font-bold text-[11px] transition-all shadow-xl disabled:opacity-50 tracking-widest"
-            >
-              {isGenerating ? 'SYNTHESIZING...' : 'GENERATE WHITE PAPER'}
-            </button>
-            <div className="bg-black/30 rounded-lg p-4 space-y-3">
-               <div className="flex justify-between text-[10px] border-b border-white/5 pb-2">
-                  <span className="text-gray-500 font-mono tracking-tighter">Budget Mode</span>
-                  <span className="text-violet-400 font-mono">THINKING_32K</span>
-               </div>
-               <div className="flex justify-between text-[10px]">
-                  <span className="text-gray-500 font-mono tracking-tighter">Objective Focus</span>
-                  <span className="text-emerald-400 font-mono">PARETO_SYNC</span>
-               </div>
+          <div className="bg-[#111] border border-white/5 p-6 rounded-2xl shadow-xl space-y-4 h-full">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-widest">Global Sync</h3>
+              <i className="fa-brands fa-google text-blue-400"></i>
             </div>
-          </div>
-
-          <div className="bg-[#111] border border-white/5 p-6 rounded-2xl h-[570px] flex flex-col shadow-inner">
-            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <i className="fa-solid fa-scroll text-amber-500"></i> Technical Manuscript
-            </h3>
-            <div className="flex-grow overflow-y-auto text-[11px] text-gray-400 leading-relaxed font-light custom-scrollbar">
-              {report ? (
-                <div className="whitespace-pre-wrap mono bg-black/40 p-4 rounded-xl border border-white/10 animate-in fade-in duration-700 leading-relaxed">
-                  {report}
+            <div className="h-[500px] overflow-y-auto pr-2 custom-scrollbar space-y-6 pt-4 border-t border-white/5">
+              {searchResults ? (
+                <div className="space-y-4 animate-in fade-in duration-700">
+                  <p className="text-[11px] text-gray-500 italic leading-relaxed">{searchResults.text}</p>
+                  <div className="space-y-2">
+                    {searchResults.sources.map((src, i) => (
+                      <a key={i} href={src.uri} target="_blank" className="block text-[9px] text-blue-400 bg-blue-500/5 p-2 rounded-lg border border-blue-500/10 truncate hover:bg-blue-500/10 transition-all">
+                        <i className="fa-solid fa-link mr-2"></i> {src.title || "Reference Source"}
+                      </a>
+                    ))}
+                  </div>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center space-y-4 opacity-10">
-                  <i className="fa-solid fa-robot text-5xl"></i>
-                  <p className="text-[10px] uppercase font-bold tracking-widest leading-relaxed">Awaiting High-Reasoning Synthesis</p>
+                <div className="h-full flex flex-col items-center justify-center opacity-20 italic space-y-4">
+                  <i className="fa-solid fa-satellite text-4xl"></i>
+                  <p className="text-[10px] text-center px-8 uppercase tracking-widest">Establishing secure 2025 ground-truth uplink...</p>
                 </div>
               )}
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Comparative Intelligence Matrix */}
-      <div className="bg-[#111] border border-white/5 p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
-        <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-          <i className="fa-solid fa-layer-group text-8xl text-emerald-500"></i>
-        </div>
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h3 className="text-lg font-black text-white tracking-tighter uppercase italic flex items-center gap-3">
-              <i className="fa-solid fa-table-list text-emerald-500"></i>
-              Comparative Intelligence Matrix
-            </h3>
-            <p className="text-[11px] text-gray-500 font-mono tracking-widest uppercase mt-1">Cross-agent multi-objective benchmark audit</p>
-          </div>
-          <div className="flex items-center gap-4 text-[10px] font-mono text-gray-600">
-            <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> EXCELLENT</span>
-            <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-amber-500"></div> NOMINAL</span>
-            <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-red-500"></div> DEGRADED</span>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left border-separate border-spacing-y-2">
-            <thead>
-              <tr className="text-[10px] font-black text-gray-600 uppercase tracking-[0.3em]">
-                <th className="px-6 py-4">Agent_Entity</th>
-                <th className="px-6 py-4 text-center">Green_Score</th>
-                <th className="px-6 py-4 text-center">QEC_Stability</th>
-                <th className="px-6 py-4 text-center">Provenance</th>
-                <th className="px-6 py-4 text-center">Latency</th>
-                <th className="px-6 py-4 text-center">Energy/T</th>
-                <th className="px-6 py-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {MOCK_AGENTS.map((agent) => {
-                const isSelected = agent.id === selectedAgentId;
-                return (
-                  <tr 
-                    key={agent.id} 
-                    className={`group transition-all duration-500 ${isSelected ? 'bg-emerald-500/5 ring-1 ring-emerald-500/20' : 'bg-white/5 hover:bg-white/10'}`}
-                  >
-                    <td className="px-6 py-5 rounded-l-2xl border-l border-t border-b border-white/5">
-                      <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${isSelected ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-white/5 border-white/10 text-gray-500'}`}>
-                          <i className={`fa-solid ${agent.id === 'gq-1' ? 'fa-microchip' : agent.id === 'ga-ref' ? 'fa-leaf' : 'fa-network-wired'}`}></i>
-                        </div>
-                        <div>
-                          <p className={`text-sm font-bold ${isSelected ? 'text-emerald-400' : 'text-white'}`}>{agent.name}</p>
-                          <p className="text-[10px] text-gray-600 font-mono tracking-tighter">v{agent.version} • {agent.id.toUpperCase()}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-5 text-center border-t border-b border-white/5">
-                      <div className="flex flex-col items-center gap-1">
-                        <span className={`text-sm font-mono font-bold ${agent.greenScore > 90 ? 'text-emerald-400' : agent.greenScore > 80 ? 'text-amber-400' : 'text-red-400'}`}>
-                          {agent.greenScore}%
-                        </span>
-                        <div className="w-16 h-1 bg-white/5 rounded-full overflow-hidden">
-                          <div className={`h-full ${agent.greenScore > 90 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${agent.greenScore}%` }}></div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-5 text-center border-t border-b border-white/5">
-                      <span className={`text-sm font-mono font-bold ${agent.quantumErrorCorrection > 80 ? 'text-violet-400' : agent.quantumErrorCorrection > 50 ? 'text-gray-400' : 'text-red-400'}`}>
-                        {agent.quantumErrorCorrection}%
-                      </span>
-                    </td>
-                    <td className="px-6 py-5 text-center border-t border-b border-white/5">
-                      <span className={`text-sm font-mono font-bold ${agent.provenanceClarity > 90 ? 'text-blue-400' : 'text-gray-400'}`}>
-                        {agent.provenanceClarity}%
-                      </span>
-                    </td>
-                    <td className="px-6 py-5 text-center border-t border-b border-white/5">
-                      <span className={`text-sm font-mono font-bold ${agent.latency < 150 ? 'text-emerald-400' : agent.latency < 200 ? 'text-gray-400' : 'text-amber-400'}`}>
-                        {agent.latency}ms
-                      </span>
-                    </td>
-                    <td className="px-6 py-5 text-center border-t border-b border-white/5">
-                      <span className="text-sm font-mono font-bold text-amber-500/80">
-                        {agent.energyPerToken}μJ
-                      </span>
-                    </td>
-                    <td className="px-6 py-5 text-right rounded-r-2xl border-r border-t border-b border-white/5">
-                      {isSelected ? (
-                        <div className="flex items-center justify-end gap-2 text-emerald-500 text-[10px] font-black uppercase tracking-widest">
-                          <i className="fa-solid fa-circle-check animate-pulse"></i>
-                          Active
-                        </div>
-                      ) : (
-                        <button 
-                          onClick={() => setSelectedAgentId(agent.id)}
-                          className="px-4 py-2 bg-white/5 hover:bg-emerald-500 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all border border-white/10 hover:border-emerald-400 text-gray-500 hover:text-white"
-                        >
-                          Benchmark
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        
-        <div className="mt-8 flex items-center justify-between text-[9px] font-mono text-gray-700 uppercase tracking-[0.3em]">
-           <div className="flex gap-6">
-              <span>Audit_Session: {(Math.random() * 100000).toFixed(0)}</span>
-              <span>•</span>
-              <span>Protocol: A2A-ISO-42001</span>
-           </div>
-           <div className="animate-pulse">Monitoring Ecosystem Drift...</div>
         </div>
       </div>
     </div>
   );
 };
 
-const MetricItem: React.FC<{ label: string; val: string; color: 'emerald' | 'violet' | 'blue' | 'amber' }> = ({ label, val, color }) => {
-  const colorMap = { emerald: 'text-emerald-400', violet: 'text-violet-400', blue: 'text-blue-400', amber: 'text-amber-400' };
-  const bgMap = { emerald: 'bg-emerald-400/5 border-emerald-400/10', violet: 'bg-violet-400/5 border-violet-400/10', blue: 'bg-blue-400/5 border-blue-400/10', amber: 'bg-amber-400/5 border-amber-400/10' };
+const MetricItem: React.FC<{ label: string; val: string; color: string }> = ({ label, val, color }) => {
+  const colorMap: any = { emerald: 'text-emerald-400', violet: 'text-violet-400', blue: 'text-blue-400', amber: 'text-amber-400' };
+  const bgMap: any = { emerald: 'bg-emerald-400/5 border-emerald-400/10', violet: 'bg-violet-400/5 border-violet-400/10', blue: 'bg-blue-400/5 border-blue-400/10', amber: 'bg-amber-400/5 border-amber-400/10' };
   return (
     <div className={`flex items-center justify-between p-3 rounded-xl border transition-all hover:scale-[1.02] ${bgMap[color]}`}>
       <span className="text-[10px] text-gray-500 uppercase font-bold tracking-tighter">{label}</span>
