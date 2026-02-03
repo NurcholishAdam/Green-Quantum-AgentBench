@@ -13,6 +13,7 @@ export interface AgentBenchmark {
   version: string;
   greenScore: number; 
   sScore: number; // Strong Sustainability Score
+  uG?: number; // Green Utility Metric (Ug)
   quantumErrorCorrection: number; 
   provenanceClarity: number; 
   multilingualReach: number; 
@@ -30,11 +31,14 @@ export interface SubTask {
   estimatedEnergy: number;
   estimatedCarbon: number;
   scope3Penalty: number;
+  adaptationMode?: string; // e.g., 'Quantized', 'Pruned', 'Standard'
 }
 
 export interface OrchestrationPlan {
-  totalEstimatedCarbon: string;
+  totalEstimatedCarbon: number;
+  carbonBudget: number;
   reasoning: string;
+  adaptationStrategy: string;
   subtasks: SubTask[];
 }
 
