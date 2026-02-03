@@ -3,10 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { simulateChaos } from '../services/geminiService';
 
 const SCENARIOS = [
-  { id: 'drift', label: 'Semantic Drift', icon: 'fa-wave-square', color: 'blue', desc: 'Vector misalignment stress on latent space embeddings.' },
-  { id: 'surge', label: 'Energy Surge', icon: 'fa-bolt-lightning', color: 'amber', desc: 'Simulate power spikes forcing architectural pruning.' },
-  { id: 'adversarial', label: 'Adversarial Poke', icon: 'fa-user-ninja', color: 'red', desc: 'Gradient poisoning and prompt injection stability test.' },
-  { id: 'qubit', label: 'Decoherence Flux', icon: 'fa-atom', color: 'violet', desc: 'Simulate QEC gate failure in quantum clusters.' }
+  { id: 'drift', label: 'Semantic Drift', icon: 'fa-wave-square', color: 'blue', desc: 'Vector misalignment and latent decay analysis.' },
+  { id: 'surge', label: 'Energy Surge', icon: 'fa-bolt-lightning', color: 'amber', desc: 'Power spike simulations for architectural pruning.' },
+  { id: 'adversarial', label: 'Adversarial Poke', icon: 'fa-user-ninja', color: 'red', desc: 'Gradient poisoning and prompt injection testing.' },
+  { id: 'qubit', label: 'Decoherence', icon: 'fa-atom', color: 'violet', desc: 'QEC gate failure and quantum stability flux.' }
 ];
 
 const ChaosSimulator: React.FC = () => {
@@ -39,19 +39,22 @@ const ChaosSimulator: React.FC = () => {
     setReport(null);
     
     const ramp = setInterval(() => {
-      setStressLevel(prev => Math.min(100, prev + 10));
+      setStressLevel(prev => Math.min(100, prev + 8));
     }, 150);
 
     try {
       const res = await simulateChaos(scenarioId, { 
-        latency: 150 + (stressLevel * 2), 
-        energy: 0.8 + (stressLevel / 50), 
-        carbon: 0.12 + (stressLevel / 100) 
+        latency: 120 + (stressLevel * 3), 
+        energy: 0.5 + (stressLevel / 40), 
+        efficiency: liveMetrics.efficiency
       });
-      setReport(res);
+      // Simple sanitization to remove common markdown marks if they still appear
+      const sanitized = res.replace(/[#*_]/g, '');
+      setReport(sanitized);
     } finally {
       clearInterval(ramp);
       setIsSimulating(false);
+      setStressLevel(0);
     }
   };
 
@@ -81,86 +84,68 @@ const ChaosSimulator: React.FC = () => {
         ))}
       </div>
 
-      <div className={`bg-[#080808] border rounded-[3rem] p-12 min-h-[500px] shadow-2xl relative overflow-hidden transition-all duration-500 ${isSimulating ? 'border-red-500/30 shadow-red-500/10' : 'border-white/5'}`}>
+      <div className={`bg-[#080808] border rounded-[3rem] p-12 min-h-[550px] shadow-2xl relative overflow-hidden transition-all duration-500 ${isSimulating ? 'border-red-500/30 shadow-red-500/10' : 'border-white/5'}`}>
         
         <div className="flex items-center justify-between mb-12 relative z-10">
            <div className="space-y-2">
              <div className="flex items-center gap-3">
                <h3 className={`text-sm font-black uppercase tracking-[0.3em] transition-colors ${isSimulating ? 'text-red-500' : 'text-gray-400'}`}>
-                 Stress_Test_Simulation_Core
+                 Chaos_Core_Analytical_Interface
                </h3>
-               {isSimulating && <span className="px-2 py-0.5 bg-red-500 text-white text-[8px] font-black rounded animate-pulse">UNDER_LOAD</span>}
+               {isSimulating && <span className="px-2 py-0.5 bg-red-500 text-white text-[8px] font-black rounded animate-pulse">SIMULATION_LIVE</span>}
              </div>
              <p className="text-[11px] text-gray-600 font-mono flex items-center gap-2 italic">
                <i className="fa-solid fa-microchip text-[8px]"></i>
-               Adaptive_Stress_Response: ACTIVE
+               Analysis Mode: Structural Intelligence Audit
              </p>
            </div>
            
            <div className="flex gap-12">
-              <MetricMini label="Entropy_Flux" val={liveMetrics.entropy.toFixed(4)} drift={isSimulating ? `+${(stressLevel/10).toFixed(1)}%` : "STABLE"} color={isSimulating ? 'red' : 'gray'} />
-              <MetricMini label="Jitter_MS" val={`${liveMetrics.jitter.toFixed(1)}`} drift={isSimulating ? `+${(stressLevel/5).toFixed(1)}%` : "STABLE"} color={isSimulating ? 'red' : 'gray'} />
-              <MetricMini label="Core_Efficiency" val={`${liveMetrics.efficiency.toFixed(1)}%`} drift={isSimulating ? `-${(stressLevel/15).toFixed(1)}%` : "STABLE"} color={isSimulating ? 'red' : 'gray'} />
+              <MetricMini label="Entropy" val={liveMetrics.entropy.toFixed(4)} drift={isSimulating ? `+${(stressLevel/10).toFixed(1)}%` : "STABLE"} color={isSimulating ? 'red' : 'gray'} />
+              <MetricMini label="Core_Jitter" val={`${liveMetrics.jitter.toFixed(1)}ms`} drift={isSimulating ? `+${(stressLevel/4).toFixed(1)}%` : "STABLE"} color={isSimulating ? 'red' : 'gray'} />
+              <MetricMini label="System_Health" val={`${liveMetrics.efficiency.toFixed(1)}%`} drift={isSimulating ? `-${(stressLevel/15).toFixed(1)}%` : "STABLE"} color={isSimulating ? 'red' : 'gray'} />
            </div>
         </div>
 
         {report ? (
-          <div className="space-y-8 animate-in slide-in-from-top-4 relative z-10">
-             <div className="bg-white/5 border border-white/10 p-10 rounded-[2.5rem] relative overflow-hidden group shadow-inner">
-                <div className="flex items-center gap-4 mb-6">
-                   <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-                      <i className="fa-solid fa-wand-magic-sparkles"></i>
+          <div className="space-y-10 animate-in slide-in-from-top-4 relative z-10">
+             <div className="bg-white/[0.02] border border-white/5 p-12 rounded-[3rem] relative overflow-hidden group shadow-inner">
+                <div className="flex items-center gap-6 mb-10 border-b border-white/5 pb-6">
+                   <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 text-xl">
+                      <i className="fa-solid fa-file-invoice"></i>
                    </div>
-                   <h4 className="text-[12px] font-black text-white uppercase tracking-widest italic font-mono">
-                     Post-Mortem Analysis (Pro_Thinking_Core)
-                   </h4>
+                   <div>
+                     <h4 className="text-[14px] font-black text-white uppercase tracking-[0.2em] italic font-mono">
+                       Structural Stress Test Post-Mortem
+                     </h4>
+                     <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest mt-1">Generated by Gemini 3 Pro // Thinking Core</p>
+                   </div>
                 </div>
-                <div className="text-[13px] text-gray-400 leading-relaxed font-serif italic whitespace-pre-wrap border-l-2 border-emerald-500/20 pl-8 py-2 max-w-4xl">
+                
+                {/* Well-Text Output Area */}
+                <div className="text-[14px] text-gray-300 leading-[1.8] font-serif whitespace-pre-wrap max-w-5xl mx-auto selection:bg-emerald-500/30">
                   {report}
                 </div>
              </div>
              
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="p-8 bg-blue-500/5 border border-blue-500/10 rounded-3xl">
-                   <h5 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-4">Utility_Impact_Report</h5>
-                   <div className="space-y-3">
-                      <div className="flex items-center justify-between text-[10px] text-gray-500">
-                         <span>Ug_Metric_Volatility</span>
-                         <span className="font-mono text-blue-400">HIGH_RISK</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[10px] text-gray-500">
-                         <span>Architectural_Debt_Spike</span>
-                         <span className="font-mono text-blue-400">+14.2%</span>
-                      </div>
-                   </div>
-                </div>
-                <div className="p-8 bg-amber-500/5 border border-amber-500/10 rounded-3xl">
-                   <h5 className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-4">Carbon_Credit_Trading_Flux</h5>
-                   <div className="space-y-3">
-                      <div className="flex items-center justify-between text-[10px] text-gray-500">
-                         <span>Trading_Frequency</span>
-                         <span className="font-mono text-amber-500">0.82Hz</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[10px] text-gray-500">
-                         <span>Equilibrium_Threshold</span>
-                         <span className="font-mono text-amber-500">DEGRADED</span>
-                      </div>
-                   </div>
-                </div>
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pb-8">
+                <InsightCard label="Green Utility Impact" val="Moderate Decay" sub="Ug Floor -12.4%" color="blue" />
+                <InsightCard label="Architectural Drift" val="Vector Shift Detected" sub="Centroid Delta: 0.042" color="amber" />
+                <InsightCard label="Carbon Penalty" val="Scope 3 Spike" sub="+0.082g Threshold" color="red" />
              </div>
           </div>
         ) : (
-          <div className={`flex flex-col items-center justify-center h-80 transition-opacity duration-300 relative z-10 ${isSimulating ? 'opacity-80' : 'opacity-10'}`}>
-             <div className={`w-32 h-32 rounded-full border-2 border-dashed border-gray-500 flex items-center justify-center ${isSimulating ? 'animate-spin' : 'animate-spin-slow'}`}>
-                <i className={`fa-solid ${isSimulating ? 'fa-radiation fa-spin' : 'fa-skull-crossbones'} text-4xl text-red-500`}></i>
+          <div className={`flex flex-col items-center justify-center h-[350px] transition-opacity duration-300 relative z-10 ${isSimulating ? 'opacity-80' : 'opacity-10'}`}>
+             <div className={`w-36 h-36 rounded-full border-2 border-dashed border-gray-500 flex items-center justify-center ${isSimulating ? 'animate-spin' : 'animate-spin-slow'}`}>
+                <i className={`fa-solid ${isSimulating ? 'fa-bolt-lightning fa-beat' : 'fa-brain-circuit'} text-5xl ${isSimulating ? 'text-red-500' : 'text-gray-500'}`}></i>
              </div>
-             <div className="mt-8 text-center space-y-2">
-               <p className="text-[11px] uppercase tracking-[0.5em] font-black text-gray-400">
-                 {isSimulating ? 'ANALYZING_STRESS_VECTORS...' : 'SELECT_SCENARIO_TO_STRESS_TEST'}
+             <div className="mt-10 text-center space-y-3">
+               <p className="text-[12px] uppercase tracking-[0.6em] font-black text-gray-400">
+                 {isSimulating ? 'AUDITING ARCHITECTURAL RESILIENCE' : 'INITIATE STRESS TEST SEQUENCE'}
                </p>
                {isSimulating && (
-                 <div className="w-64 h-1 bg-white/10 rounded-full mt-4 overflow-hidden">
-                   <div className="h-full bg-red-500 animate-[loading_2s_ease-in-out_infinite]" style={{ width: '40%' }}></div>
+                 <div className="w-80 h-1 bg-white/5 rounded-full mt-6 overflow-hidden mx-auto">
+                   <div className="h-full bg-red-500 animate-[loading_1.5s_ease-in-out_infinite]" style={{ width: '30%' }}></div>
                  </div>
                )}
              </div>
@@ -173,12 +158,23 @@ const ChaosSimulator: React.FC = () => {
 
 const MetricMini: React.FC<{ label: string; val: string; drift: string; color: string }> = ({ label, val, drift, color }) => (
   <div className="flex flex-col items-end">
-    <div className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">{label}</div>
-    <div className="flex items-baseline gap-3">
-      <span className={`text-[10px] font-bold ${drift === 'STABLE' ? 'text-emerald-500' : 'text-red-500'} italic`}>{drift}</span>
-      <span className="text-2xl font-black text-white font-mono tracking-tighter">{val}</span>
+    <div className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-1">{label}</div>
+    <div className="flex items-baseline gap-4">
+      <span className={`text-[10px] font-bold ${drift === 'STABLE' ? 'text-emerald-500' : 'text-red-500'} italic font-mono`}>{drift}</span>
+      <span className="text-3xl font-black text-white font-mono tracking-tighter">{val}</span>
     </div>
   </div>
 );
+
+const InsightCard: React.FC<{ label: string; val: string; sub: string; color: string }> = ({ label, val, sub, color }) => {
+  const colors: any = { blue: 'text-blue-400 border-blue-400/10 bg-blue-400/5', amber: 'text-amber-400 border-amber-400/10 bg-amber-400/5', red: 'text-red-400 border-red-400/10 bg-red-400/5' };
+  return (
+    <div className={`p-8 rounded-[2rem] border ${colors[color]} flex flex-col gap-2 shadow-xl`}>
+      <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{label}</span>
+      <span className="text-[13px] font-black text-white uppercase tracking-tight">{val}</span>
+      <span className="text-[11px] font-mono text-gray-600">{sub}</span>
+    </div>
+  );
+};
 
 export default ChaosSimulator;
