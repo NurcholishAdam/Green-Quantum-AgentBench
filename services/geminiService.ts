@@ -102,13 +102,23 @@ export const simulateChaos = async (chaosType: string, metrics: any): Promise<st
 
 /**
  * Retrieve graph telemetry nodes and links.
+ * Enhanced to specifically request decision path stability and recursive lineage.
  */
 export const getGraphTelemetry = async (type: string): Promise<QuantumGraphData> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Generate a JSON provenance graph for "${type}". Nodes include 'hardware' type. JSON ONLY.`,
+      contents: `Generate a JSON object representing a dynamic ${type} provenance graph for a Green AI Agent system.
+      
+      REQUIREMENTS:
+      1. Include at least 8-12 nodes of types: 'quantum', 'agent', 'provenance', 'policy', 'hardware'.
+      2. 'links' must connect these nodes. 
+      3. Each link must have a 'weight' (1-30) representing "Path Stability" or "Entanglement Strength".
+      4. Nodes must have a 'val' (0-100) representing "Node Fidelity" or "Coherence".
+      5. The structure should reflect a recursive decision lineage (e.g., provenance nodes pointing to agent nodes which point to hardware nodes).
+      
+      JSON ONLY, strictly adhering to: { nodes: Array<{id, label, type, val}>, links: Array<{source, target, weight}> }`,
       config: { responseMimeType: "application/json" }
     });
     return JSON.parse(response.text || '{"nodes":[], "links":[]}');

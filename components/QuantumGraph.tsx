@@ -16,7 +16,7 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [graphData, setGraphData] = useState<QuantumGraphData>(initialData);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [visibleTypes, setVisibleTypes] = useState<Set<string>>(new Set(['quantum', 'agent', 'error', 'provenance', 'policy']));
+  const [visibleTypes, setVisibleTypes] = useState<Set<string>>(new Set(['quantum', 'agent', 'error', 'provenance', 'policy', 'hardware']));
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
 
   const toggleType = (type: string) => {
@@ -45,10 +45,15 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
     }
   }, [type]);
 
+  // Sync with incoming initialData prop (important when App.tsx updates it)
+  useEffect(() => {
+    setGraphData(initialData);
+  }, [initialData]);
+
   // Initial load and auto-refresh logic
   useEffect(() => {
     if (autoRefresh) {
-      const interval = setInterval(fetchUpdate, 15000);
+      const interval = setInterval(fetchUpdate, 20000); // 20s interval for stability tracking
       return () => clearInterval(interval);
     }
   }, [autoRefresh, fetchUpdate]);
@@ -60,10 +65,10 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
         ...prev,
         nodes: prev.nodes.map(n => ({
           ...n,
-          val: Math.max(10, Math.min(100, n.val + (Math.random() - 0.5) * 4))
+          val: Math.max(10, Math.min(100, n.val + (Math.random() - 0.5) * 2))
         }))
       }));
-    }, 2000);
+    }, 3000);
     return () => clearInterval(jitterInterval);
   }, []);
 
@@ -99,10 +104,10 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
       svg.append("g").attr("class", "nodes");
 
       simulationRef.current = d3.forceSimulation()
-        .force("link", d3.forceLink().id((d: any) => d.id).distance(120))
-        .force("charge", d3.forceManyBody().strength(-300))
+        .force("link", d3.forceLink().id((d: any) => d.id).distance(140))
+        .force("charge", d3.forceManyBody().strength(-400))
         .force("center", d3.forceCenter(width / 2, height / 2))
-        .force("collision", d3.forceCollide().radius(50));
+        .force("collision", d3.forceCollide().radius(60));
     }
 
     const sim = simulationRef.current;
@@ -128,24 +133,24 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
 
     const linkElements = svg.select(".links")
       .selectAll("line")
-      .data(links, (d: any) => `${d.source.id}-${d.target.id}`)
+      .data(links, (d: any) => `${typeof d.source === 'string' ? d.source : d.source.id}-${typeof d.target === 'string' ? d.target : d.target.id}`)
       .join(
         enter => enter.append("line")
           .attr("stroke-width", 0)
           .attr("stroke-opacity", 0)
-          .transition().duration(500)
-          .attr("stroke-opacity", (d: any) => Math.min(0.6, 0.1 + (d.weight / 20)))
-          .attr("stroke-width", (d: any) => 1 + (d.weight / 6))
+          .transition().duration(800)
+          .attr("stroke-opacity", (d: any) => Math.min(0.7, 0.15 + (d.weight / 40)))
+          .attr("stroke-width", (d: any) => 1.5 + (d.weight / 8))
           .selection(),
         update => update
-          .transition().duration(500)
-          .attr("stroke-width", (d: any) => 1 + (d.weight / 6))
-          .attr("stroke-opacity", (d: any) => Math.min(0.6, 0.1 + (d.weight / 20)))
+          .transition().duration(800)
+          .attr("stroke-width", (d: any) => 1.5 + (d.weight / 8))
+          .attr("stroke-opacity", (d: any) => Math.min(0.7, 0.15 + (d.weight / 40)))
           .selection(),
         exit => exit.transition().duration(500).attr("stroke-width", 0).remove()
       )
-      .attr("stroke", (d: any) => d.weight > 15 ? "#10b981" : "#444")
-      .attr("stroke-dasharray", (d: any) => d.weight < 5 ? "5,5" : "none");
+      .attr("stroke", (d: any) => d.weight > 20 ? "#10b981" : d.weight > 10 ? "#3b82f6" : "#444")
+      .attr("stroke-dasharray", (d: any) => d.weight < 8 ? "6,4" : "none");
 
     const nodeElements = svg.select(".nodes")
       .selectAll("circle")
@@ -154,7 +159,7 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
         enter => enter.append("circle")
           .attr("r", 0)
           .attr("stroke", "#fff")
-          .attr("stroke-width", 1)
+          .attr("stroke-width", 1.5)
           .attr("opacity", 0)
           .call(d3.drag<any, any>()
             .on("start", (event, d) => {
@@ -169,28 +174,28 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
               d.fx = null; d.fy = null;
             }) as any
           )
-          .transition().duration(800)
-          .attr("r", (d: any) => 12 + (d.val / 8))
+          .transition().duration(1000)
+          .attr("r", (d: any) => 14 + (d.val / 7))
           .attr("opacity", 1)
           .selection(),
         update => update
-          .transition().duration(800)
-          .attr("r", (d: any) => 12 + (d.val / 8))
+          .transition().duration(1000)
+          .attr("r", (d: any) => 14 + (d.val / 7))
           .selection(),
         exit => exit.transition().duration(500).attr("r", 0).remove()
       )
       .on("mouseover", (event, d: any) => {
         tooltip.transition().duration(200).style("opacity", 1);
         tooltip.html(`
-          <div class="space-y-2 min-w-[220px]">
+          <div class="space-y-2 min-w-[240px]">
             <div class="flex items-center justify-between border-b border-white/10 pb-2 mb-1">
               <span class="text-[9px] uppercase font-black tracking-[0.2em] text-gray-500 font-mono">${d.type}_node</span>
-              <span class="text-[8px] font-mono text-white/30 italic">ENTANGLEMENT_ID_${d.id}</span>
+              <span class="text-[8px] font-mono text-white/30 italic">ID:${d.id}</span>
             </div>
             <div class="text-[16px] font-black text-white tracking-tight leading-tight">${d.label}</div>
             <div class="pt-2 space-y-3">
               <div class="flex items-center justify-between">
-                <span class="text-[9px] text-gray-600 uppercase font-black">Coherence_Flux</span>
+                <span class="text-[9px] text-gray-600 uppercase font-black">Node_Fidelity</span>
                 <span class="text-[13px] font-mono font-bold" style="color: ${QUANTUM_COLORS[d.type as keyof typeof QUANTUM_COLORS]}">${d.val.toFixed(2)}%</span>
               </div>
               <div class="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
@@ -207,7 +212,7 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
         tooltip.transition().duration(500).style("opacity", 0);
       })
       .attr("fill", (d: any) => QUANTUM_COLORS[d.type as keyof typeof QUANTUM_COLORS])
-      .attr("filter", (d: any) => d.val > 70 ? `url(#glow-${d.type})` : "none");
+      .attr("filter", (d: any) => d.val > 75 ? `url(#glow-${d.type})` : "none");
 
     sim.on("tick", () => {
       linkElements
@@ -221,20 +226,20 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
         .attr("cy", (d: any) => d.y);
     });
 
-    sim.alpha(0.1).restart();
+    sim.alpha(0.15).restart();
   }, [graphData, visibleTypes]);
 
   return (
-    <div className="relative w-full bg-[#0d0d0d] border border-white/5 rounded-[3rem] overflow-hidden h-[500px] shadow-[0_40px_100px_rgba(0,0,0,0.6)] flex flex-col group">
+    <div className="relative w-full bg-[#0d0d0d] border border-white/5 rounded-[3rem] overflow-hidden h-[550px] shadow-[0_40px_100px_rgba(0,0,0,0.6)] flex flex-col group">
       <div ref={tooltipRef} className="pointer-events-none fixed z-[9999] opacity-0 bg-black/90 backdrop-blur-3xl border border-white/10 p-6 rounded-[2rem] shadow-2xl transition-opacity duration-300" />
       
       <div className="absolute top-10 left-12 z-10 space-y-2">
         <div className="flex items-center gap-4">
            <div className={`w-3 h-3 rounded-full ${isSyncing ? 'bg-amber-500 animate-ping' : 'bg-emerald-500'} shadow-lg shadow-emerald-500/20`}></div>
-           <h3 className="text-[11px] font-black text-white uppercase tracking-[0.5em] font-mono">Quantum_Entanglement_Visualizer</h3>
+           <h3 className="text-[11px] font-black text-white uppercase tracking-[0.5em] font-mono">Dynamic_Lineage_Orchestrator</h3>
         </div>
         <p className="text-[9px] font-mono text-gray-600 uppercase tracking-widest pl-7">
-          {isSyncing ? 'Synchronizing Semantic Lineage...' : 'Monitoring Real-time Provenance Drift'}
+          {isSyncing ? 'Recalculating Decision Lineage...' : 'Tracking Real-time Path Stability Flux'}
         </p>
       </div>
 
@@ -256,7 +261,7 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
           onClick={fetchUpdate}
           disabled={isSyncing}
           className="w-8 h-8 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 flex items-center justify-center transition-all active:scale-90"
-          title="Manual Sync"
+          title="Force Entanglement Sync"
         >
           <i className={`fa-solid fa-sync ${isSyncing ? 'fa-spin' : ''}`}></i>
         </button>
@@ -264,20 +269,24 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
 
       <div className="absolute bottom-10 left-12 z-10 space-y-3">
         <div className="flex items-center gap-4 group/legend">
-           <div className="w-12 h-[2px] bg-gradient-to-r from-emerald-500 to-emerald-500/10"></div>
-           <span className="text-[8px] font-black text-gray-600 uppercase tracking-[0.2em] group-hover/legend:text-emerald-500/60 transition-colors">Stable_Lineage_Fork</span>
+           <div className="w-12 h-[3px] bg-gradient-to-r from-emerald-500 to-emerald-500/10 rounded-full"></div>
+           <span className="text-[8px] font-black text-gray-600 uppercase tracking-[0.2em] group-hover/legend:text-emerald-500/80 transition-colors">Stable_Decision_Lineage</span>
         </div>
         <div className="flex items-center gap-4 group/legend">
-           <div className="w-12 h-[2px] border-t border-dashed border-gray-600"></div>
-           <span className="text-[8px] font-black text-gray-600 uppercase tracking-[0.2em] group-hover/legend:text-gray-400/60 transition-colors">Stochastic_Drift_Path</span>
+           <div className="w-12 h-[3px] bg-gradient-to-r from-blue-500 to-blue-500/10 rounded-full"></div>
+           <span className="text-[8px] font-black text-gray-600 uppercase tracking-[0.2em] group-hover/legend:text-blue-500/80 transition-colors">Quantum_Entanglement_Flux</span>
+        </div>
+        <div className="flex items-center gap-4 group/legend">
+           <div className="w-12 h-[1px] border-t border-dashed border-gray-600"></div>
+           <span className="text-[8px] font-black text-gray-600 uppercase tracking-[0.2em] group-hover/legend:text-gray-400 transition-colors">Stochastic_Inference_Drift</span>
         </div>
       </div>
 
       <div className="absolute bottom-10 right-12 z-10 pointer-events-none opacity-40">
          <div className="text-[10px] font-mono text-gray-700 text-right">
-            NODES: {graphData.nodes.length}<br/>
-            EDGES: {graphData.links.length}<br/>
-            FIDELITY: {(graphData.nodes.reduce((acc, n) => acc + n.val, 0) / graphData.nodes.length || 0).toFixed(1)}%
+            ACTIVE_NODES: {graphData.nodes.length}<br/>
+            PATH_ENTROPY: {(1 - (graphData.links.reduce((acc, l) => acc + l.weight, 0) / (graphData.links.length * 30 || 1))).toFixed(3)}<br/>
+            FIDELITY_FLOOR: {(graphData.nodes.reduce((acc, n) => acc + n.val, 0) / graphData.nodes.length || 0).toFixed(1)}%
          </div>
       </div>
 
