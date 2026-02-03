@@ -1,5 +1,7 @@
 {
   "name": "Green-Quantum AgentBench",
   "description": "A sophisticated benchmarking suite for sustainable AI agents, integrating quantum-limit graph architectures, error correction metrics, and multilingual provenance tracking for the AgentBeats ecosystem.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "microphone"
+  ]
 }

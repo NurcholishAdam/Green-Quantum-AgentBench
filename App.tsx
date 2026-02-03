@@ -8,6 +8,7 @@ import PolicyAuditor from './components/PolicyAuditor';
 import ChaosSimulator from './components/ChaosSimulator';
 import OrchestratorView from './components/OrchestratorView';
 import HardwareSelector from './components/HardwareSelector';
+import LiveAssistant from './components/LiveAssistant';
 import { 
   getQuantumTelemetry, 
   getGreenTelemetry, 
@@ -160,7 +161,7 @@ const App: React.FC = () => {
           <ModuleViewer 
             title="Chaos Workbench" 
             icon="fa-fire-flame-curved" color="red" 
-            description="Stress-test the cluster with hardware-aware anomalies."
+            description="Stress-test the cluster with hardware-aware anomalies analyzed by Gemini 3 Pro."
             initialInsights={[
               { label: "Anomaly Entropy", value: "0.002", subtext: "Clean signal", icon: "fa-wave-square", progress: 2 },
               { label: "HW Jitter", value: "4ms", subtext: "Clock stability", icon: "fa-stopwatch", progress: 8 },
@@ -201,6 +202,7 @@ const App: React.FC = () => {
       </nav>
       <main className="flex-grow overflow-y-auto bg-[#0a0a0a] relative">
         {renderContent()}
+        <LiveAssistant />
       </main>
     </div>
   );
