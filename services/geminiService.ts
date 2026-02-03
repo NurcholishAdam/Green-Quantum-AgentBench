@@ -1,162 +1,129 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { AgentBenchmark, A2ARequest, A2AResponse, QuantumGraphData } from "../types";
+import { AgentBenchmark, A2ARequest, A2AResponse, QuantumGraphData, OrchestrationPlan } from "../types";
 
+// Define SearchResult for grounding tasks
 export interface SearchResult {
   text: string;
-  sources: { uri: string; title?: string }[];
+  links: { title: string; uri: string }[];
 }
 
 /**
- * Interactive Policy Auditor.
- * Uses Gemini 3 Pro Thinking to perform a deep-dive audit of a user-provided policy.
+ * Calculates the Strong Sustainability Score (S-Score).
+ * Formula: S = Accuracy * e^{-(Energy/Baseline)}
+ */
+export const calculateSScore = (accuracy: number, energy: number, baseline: number): number => {
+  return accuracy * Math.exp(-(energy / baseline));
+};
+
+/**
+ * Carbon-Aware Supervisor.
+ * Uses Gemini 3 Pro Thinking to orchestrate sub-tasks based on carbon pricing.
+ */
+export const getSupervisorPlan = async (task: string, agents: AgentBenchmark[], hwType: string): Promise<OrchestrationPlan> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-pro-preview",
+      contents: `You are the CARBON SUPERVISOR for a multi-agent cluster running on ${hwType}.
+      Task: "${task}"
+      
+      Available Agents:
+      ${agents.map(a => `- ${a.id}: ${a.name} (Energy: ${a.energyPerToken}uJ/T, Score: ${a.greenScore})`).join('\n')}
+      
+      ORCHESTRATION RULES:
+      1. Break the task into 3 distinct sub-tasks.
+      2. Assign each to the most "Carbon-Efficient" agent for that sub-role.
+      3. If a task requires external data, apply a "Scope 3" Network Penalty of 0.05g.
+      4. Calculate the total estimated carbon for the plan.
+      
+      Return a JSON plan including reasoning and sub-tasks.`,
+      config: {
+        thinkingConfig: { thinkingBudget: 32768 },
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            totalEstimatedCarbon: { type: Type.STRING },
+            reasoning: { type: Type.STRING },
+            subtasks: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING },
+                  label: { type: Type.STRING },
+                  assignedAgentId: { type: Type.STRING },
+                  estimatedEnergy: { type: Type.NUMBER },
+                  estimatedCarbon: { type: Type.NUMBER },
+                  scope3Penalty: { type: Type.NUMBER }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+    return JSON.parse(response.text || "{}");
+  } catch (error) {
+    console.error("Supervisor offline", error);
+    return { reasoning: "Failed to generate plan.", totalEstimatedCarbon: "N/A", subtasks: [] };
+  }
+};
+
+/**
+ * Audit policy using complex reasoning.
  */
 export const auditPolicy = async (policyText: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `PERFORM A DEEP SUSTAINABILITY AUDIT on the following AgentBeats policy:
-      "${policyText}"
-      
-      CRITERIA:
-      1. Quantum Gate Efficiency (QEC).
-      2. Carbon Intensity vs. Reasoning Depth.
-      3. Memory Recirculation.
-      
-      Provide a technical critique and a predicted "Green-Score" impact.`,
-      config: {
-        thinkingConfig: { thinkingBudget: 20000 }
-      }
+      contents: `AUDIT Policy: ${policyText}. focus on S-Score penalization for heavy models.`,
+      config: { thinkingConfig: { thinkingBudget: 16000 } }
     });
-    return response.text;
-  } catch (error) {
-    return "Policy auditor node unreachable.";
-  }
+    return response.text || "Audit process returned no output.";
+  } catch (error) { return "Audit failed due to connectivity issues."; }
 };
 
 /**
- * Chaos Stress-Test Simulation.
+ * Simulate hardware or semantic chaos.
  */
 export const simulateChaos = async (chaosType: string, metrics: any): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Simulate a "${chaosType}" event in the Green Agent cluster. 
-      Current Metrics: ${JSON.stringify(metrics)}.
-      Describe the cascading failures in technical detail and provide an autonomous mitigation protocol. 
-      Use immersive, high-fidelity technical language.`,
+      contents: `Simulate "${chaosType}" on metrics: ${JSON.stringify(metrics)}. Describe the impact in one technical paragraph.`,
     });
-    return response.text;
-  } catch (error) {
-    return "Chaos simulation engine failed to initialize.";
-  }
+    return response.text || "Chaos simulation failed.";
+  } catch (error) { return "Sim failed."; }
 };
 
-export const getPolicyFeedback = async (agent: AgentBenchmark, task: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
-      contents: `Perform an INDEPENDENT POLICY CRITIQUE for Green Agent: ${agent.name}.
-      Task contexts: ${task}.
-      Critique the internal policy regarding:
-      1. Pareto-optimality between Latency and Energy.
-      2. Memory footprint vs Task Success.
-      3. Carbon transparency.`,
-      config: {
-        thinkingConfig: { thinkingBudget: 15000 }
-      }
-    });
-    return response.text;
-  } catch (error) {
-    return "Policy Feedback uplink failed.";
-  }
-};
-
-export const getPolicyReporter = async (query: string): Promise<SearchResult> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Search for current 2025 "Green AI" standards and reporting requirements. Query: ${query}`,
-      config: { tools: [{ googleSearch: {} }] },
-    });
-    const sources: { uri: string; title?: string }[] = [];
-    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    chunks.forEach((chunk: any) => {
-      if (chunk.web?.uri) sources.push({ uri: chunk.web.uri, title: chunk.web.title });
-    });
-    return { text: response.text || "", sources };
-  } catch (error) {
-    return { text: "Uplink to global standards node timed out.", sources: [] };
-  }
-};
-
-export const getChaosNotice = async (metrics: any): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Scan these metrics for "Chaos" anomalies: ${JSON.stringify(metrics)}. Generate a short alert.`,
-    });
-    return response.text;
-  } catch (error) {
-    return "Chaos monitor offline.";
-  }
-};
-
+/**
+ * Retrieve graph telemetry nodes and links.
+ */
 export const getGraphTelemetry = async (type: string): Promise<QuantumGraphData> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Generate a JSON object for a "${type}" provenance graph. Include nodes and links. Reflect high-fidelity Green Agent interactions. JSON ONLY.`,
+      contents: `Generate a JSON provenance graph for "${type}". Nodes include 'hardware' type. JSON ONLY.`,
       config: { responseMimeType: "application/json" }
     });
-    return JSON.parse(response.text);
-  } catch (error) {
-    return { nodes: [], links: [] };
-  }
+    return JSON.parse(response.text || '{"nodes":[], "links":[]}');
+  } catch (error) { return { nodes: [], links: [] }; }
 };
 
-export const getQuantumTelemetry = async (insights: any[]): Promise<any[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Generate real-time telemetry updates for quantum metrics: ${JSON.stringify(insights)}. Return updated values and progress. JSON ONLY.`,
-      config: { 
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              label: { type: Type.STRING },
-              value: { type: Type.STRING },
-              subtext: { type: Type.STRING },
-              icon: { type: Type.STRING },
-              progress: { type: Type.NUMBER }
-            },
-            required: ["label", "value", "subtext", "icon", "progress"]
-          }
-        }
-      }
-    });
-    return JSON.parse(response.text);
-  } catch (error) {
-    return insights;
-  }
-};
-
+/**
+ * Update sustainability insights via GenAI.
+ */
 export const getGreenTelemetry = async (insights: any[]): Promise<any[]> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Generate real-time sustainability telemetry for: ${JSON.stringify(insights)}. Return updated values and progress. JSON ONLY.`,
+      contents: `Generate sustainability telemetry for: ${JSON.stringify(insights)}. Focus on S-Score impact.`,
       config: { 
         responseMimeType: "application/json",
         responseSchema: {
@@ -169,25 +136,73 @@ export const getGreenTelemetry = async (insights: any[]): Promise<any[]> => {
               subtext: { type: Type.STRING },
               icon: { type: Type.STRING },
               progress: { type: Type.NUMBER }
-            },
-            required: ["label", "value", "subtext", "icon", "progress"]
+            }
           }
         }
       }
     });
-    return JSON.parse(response.text);
-  } catch (error) {
-    return insights;
-  }
+    return JSON.parse(response.text || "[]");
+  } catch (error) { return insights; }
 };
 
-export const getProvenanceTelemetry = async (insights: any[]): Promise<any[]> => {
+/**
+ * Analyze policy feedback for a specific agent.
+ */
+export const getPolicyFeedback = async (agent: AgentBenchmark, instruction: string): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-pro-preview",
+      contents: `Critique the following instruction for ${agent.name} (S-Score: ${agent.sScore}): "${instruction}". Focus on potential sustainability violations.`,
+      config: { thinkingConfig: { thinkingBudget: 8000 } }
+    });
+    return response.text || "No feedback available.";
+  } catch (error) { return "Feedback loop interrupted."; }
+};
+
+/**
+ * Fetch search-grounded sustainability reports.
+ */
+export const getPolicyReporter = async (agent: AgentBenchmark): Promise<SearchResult> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Generate real-time provenance telemetry updates: ${JSON.stringify(insights)}. JSON ONLY.`,
-      config: { 
+      contents: `Find recent carbon intensity and efficiency reports for ${agent.name} hardware context.`,
+      config: { tools: [{ googleSearch: {} }] }
+    });
+    const links = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.map((chunk: any) => ({
+      title: chunk.web?.title || "Sustainability Resource",
+      uri: chunk.web?.uri || ""
+    })).filter((l: any) => l.uri) || [];
+    return { text: response.text || "", links };
+  } catch (error) { return { text: "Search grounding failed.", links: [] }; }
+};
+
+/**
+ * Generate a real-time chaos notification.
+ */
+export const getChaosNotice = async (agent: AgentBenchmark): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Generate a brief anomaly warning (max 12 words) for the current cluster state involving ${agent.name}.`,
+    });
+    return response.text || "Metric anomaly detected.";
+  } catch (error) { return "Chaos monitor offline."; }
+};
+
+/**
+ * Update quantum state telemetry.
+ */
+export const getQuantumTelemetry = async (insights: any[]): Promise<any[]> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Update these quantum metrics with realistic simulated shifts: ${JSON.stringify(insights)}`,
+      config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -199,56 +214,47 @@ export const getProvenanceTelemetry = async (insights: any[]): Promise<any[]> =>
               subtext: { type: Type.STRING },
               icon: { type: Type.STRING },
               progress: { type: Type.NUMBER }
-            },
-            required: ["label", "value", "subtext", "icon", "progress"]
+            }
           }
         }
       }
     });
-    return JSON.parse(response.text);
-  } catch (error) {
-    return insights;
-  }
+    return JSON.parse(response.text || "[]");
+  } catch (error) { return insights; }
 };
 
+/**
+ * Update decision provenance telemetry.
+ */
+export const getProvenanceTelemetry = async (insights: any[]): Promise<any[]> => {
+  // Provenance telemetry follows similar update patterns to quantum telemetry
+  return getQuantumTelemetry(insights);
+};
+
+/**
+ * Process agent-to-agent task handshake.
+ */
 export const processA2ATask = async (request: A2ARequest, agent: AgentBenchmark): Promise<A2AResponse> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `A2A HANDSHAKE: Task: ${request.instruction}, Agent: ${agent.name}`,
+      contents: `Process instruction: "${request.instruction}" for agent ${agent.name}. Return A2AResponse JSON with metrics.`,
       config: {
         responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            status: { type: Type.STRING },
-            payload: {
-              type: Type.OBJECT,
-              properties: {
-                result: { type: Type.STRING },
-                metrics: {
-                  type: Type.OBJECT,
-                  properties: {
-                    energy_consumed_uj: { type: Type.NUMBER },
-                    quantum_fidelity: { type: Type.NUMBER },
-                    token_count: { type: Type.NUMBER },
-                    carbon_intensity_g: { type: Type.NUMBER },
-                    latency_ms: { type: Type.NUMBER },
-                    memory_peak_mb: { type: Type.NUMBER }
-                  }
-                },
-                metadata: { type: Type.OBJECT, properties: { timestamp: { type: Type.STRING }, agent_id: { type: Type.STRING } } }
-              }
-            },
-            reasoning_log: { type: Type.STRING }
-          }
-        },
         thinkingConfig: { thinkingBudget: 20000 }
       }
     });
-    return JSON.parse(response.text);
+    return JSON.parse(response.text || "{}");
   } catch (error) {
-    return { status: 'failure', payload: { result: "Error", metrics: { energy_consumed_uj: 0, quantum_fidelity: 0, token_count: 0, carbon_intensity_g: 0, latency_ms: 0, memory_peak_mb: 0 }, metadata: { timestamp: "", agent_id: "" } }, reasoning_log: "Failed" };
+    return { 
+      status: 'failure', 
+      payload: { 
+        result: "Handshake Error", 
+        metrics: { energy_consumed_uj: 0, quantum_fidelity: 0, token_count: 0, carbon_intensity_g: 0, latency_ms: 0, memory_peak_mb: 0, scope3_penalty: 0 }, 
+        metadata: { timestamp: new Date().toISOString(), agent_id: agent.id, s_score: 0 } 
+      }, 
+      reasoning_log: "System fault in A2A bridge." 
+    };
   }
 };

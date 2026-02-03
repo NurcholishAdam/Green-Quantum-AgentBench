@@ -1,20 +1,24 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import Dashboard from './components/Dashboard';
 import GreenParetoChart from './components/GreenParetoChart';
 import QuantumGraph from './components/QuantumGraph';
 import MultilingualMosaic from './components/MultilingualMosaic';
 import PolicyAuditor from './components/PolicyAuditor';
 import ChaosSimulator from './components/ChaosSimulator';
+import OrchestratorView from './components/OrchestratorView';
+import HardwareSelector from './components/HardwareSelector';
 import { 
   getQuantumTelemetry, 
   getGreenTelemetry, 
   getGraphTelemetry,
-  getProvenanceTelemetry 
+  getProvenanceTelemetry,
+  calculateSScore
 } from './services/geminiService';
-import { QuantumGraphData } from './types';
+import { QuantumGraphData, HardwareType } from './types';
+import { HARDWARE_PROFILES } from './constants';
 
-type TabType = 'dashboard' | 'policy' | 'chaos' | 'quantum' | 'green' | 'provenance' | 'mosaic';
+type TabType = 'dashboard' | 'orchestrator' | 'policy' | 'chaos' | 'quantum' | 'green' | 'provenance' | 'mosaic';
 
 interface Insight {
   label: string;
@@ -26,15 +30,19 @@ interface Insight {
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [hwContext, setHwContext] = useState<HardwareType>('H100_Cluster');
+  
+  const hwProfile = useMemo(() => HARDWARE_PROFILES[hwContext], [hwContext]);
+
   const [provenanceData, setProvenanceData] = useState<QuantumGraphData>({
     nodes: [
       { id: 'n1', label: 'Inception Node', type: 'provenance', val: 95 },
       { id: 'n2', label: 'Decision Logic', type: 'agent', val: 88 },
-      { id: 'n3', label: 'Quantum Shift', type: 'quantum', val: 72 }
+      { id: 'hw1', label: hwContext, type: 'hardware', val: 100 }
     ],
     links: [
       { source: 'n1', target: 'n2', weight: 12 },
-      { source: 'n2', target: 'n3', weight: 8 }
+      { source: 'n2', target: 'hw1', weight: 25 }
     ]
   });
 
@@ -47,18 +55,33 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard': return <Dashboard />;
+      case 'dashboard': return <Dashboard hwProfile={hwProfile} />;
+      case 'orchestrator':
+        return (
+          <ModuleViewer 
+            title="Carbon Supervisor" 
+            icon="fa-network-wired" 
+            color="emerald" 
+            description="Multi-agent orchestration using Carbon-Aware dispatch. Supervisor agents assign tasks based on energy prices and Scope 3 network penalties."
+            initialInsights={[
+              { label: "Orchestration Efficiency", value: "98.2%", subtext: "Alignment vs. Baseline", icon: "fa-chess", progress: 98 },
+              { label: "Subtask Count", value: "3 Active", subtext: "Recursive splits", icon: "fa-diagram-successor", progress: 75 },
+              { label: "Scope 3 Tracking", value: "Enabled", subtext: "Network Hop Penalties", icon: "fa-cloud", progress: 100 }
+            ]}
+            extraContent={() => <OrchestratorView hwType={hwContext} />}
+          />
+        );
       case 'mosaic':
         return (
           <ModuleViewer 
             title="Global Mosaic" 
             icon="fa-language" 
             color="violet" 
-            description="Visualizing the cross-script semantic reach of the Green Agent ecosystem. Mapping semantic drift across high and low-resource linguistic nodes."
+            description="Visualizing the cross-script semantic reach. Monitoring energy intensity of different scripts in the current hardware context."
             initialInsights={[
-              { label: "Semantic Parity", value: "0.98", subtext: "ISO-Node alignment", icon: "fa-equals", progress: 98 },
-              { label: "Token Symmetry", value: "94.2%", subtext: "Cross-script efficiency", icon: "fa-dna", progress: 94 },
-              { label: "Zero-Shot Flux", value: "0.02", subtext: "Fidelity variance", icon: "fa-wind", progress: 2 }
+              { label: "Script Parity", value: "0.98", subtext: "ISO-Node alignment", icon: "fa-equals", progress: 98 },
+              { label: "Token Symmetry", value: "94.2%", subtext: "Efficiency", icon: "fa-dna", progress: 94 },
+              { label: "S-Score Stability", value: "0.82", subtext: "Fidelity flux", icon: "fa-wind", progress: 82 }
             ]}
             extraContent={() => <MultilingualMosaic />}
           />
@@ -69,11 +92,11 @@ const App: React.FC = () => {
             title="QL-Graph Provenance" 
             icon="fa-diagram-project" 
             color="blue" 
-            description="Tracking the recursive lineage of agent decisions through quantum-limit graph structures. Visualizing the chain of custody for semantic weights."
+            description="Recursive decision lineage with Hardware-Software co-design verification."
             initialInsights={[
-              { label: "Node Integrity", value: "98.8%", subtext: "Lineage verification score", icon: "fa-link", progress: 98 },
-              { label: "Link Density", value: "4.2x", subtext: "Recursive branching factor", icon: "fa-share-nodes", progress: 65 },
-              { label: "Lineage Depth", value: "142", subtext: "Sequential decision hops", icon: "fa-layer-group", progress: 82 }
+              { label: "Node Integrity", value: "98.8%", subtext: "Lineage score", icon: "fa-link", progress: 98 },
+              { label: "HW Linkage", value: hwContext, subtext: "Constraint verification", icon: "fa-microchip", progress: 100 },
+              { label: "Lineage Depth", value: "142", subtext: "Decision hops", icon: "fa-layer-group", progress: 82 }
             ]}
             telemetryFn={async (insights) => {
               const updatedInsights = await getProvenanceTelemetry(insights);
@@ -82,17 +105,6 @@ const App: React.FC = () => {
             }}
             extraContent={() => (
               <div className="space-y-6">
-                <div className="flex justify-between items-center bg-blue-500/5 border border-blue-500/10 p-6 rounded-3xl">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400">
-                      <i className="fa-solid fa-code-branch"></i>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Active_Lineage_Trace</p>
-                      <p className="text-xs text-gray-500">Visualizing recursive provenance nodes for selected agent node.</p>
-                    </div>
-                  </div>
-                </div>
                 <QuantumGraph data={provenanceData} />
               </div>
             )}
@@ -101,14 +113,14 @@ const App: React.FC = () => {
       case 'green':
         return (
           <ModuleViewer 
-            title="Green Metrics" 
+            title="S-Score Metrics" 
             icon="fa-leaf" 
             color="emerald" 
-            description="Tracking the environmental impact of agentic reasoning. Monitoring energy intensity and carbon footprint live on the Pareto Frontier."
+            description="Implementing 'Strong Sustainability' metrics. Penalizing model size to reward efficiency on the Pareto Frontier."
             initialInsights={[
-              { label: "Energy Intensity", value: "0.12μJ/T", subtext: "Per-token baseline", icon: "fa-bolt", progress: 96 },
-              { label: "Carbon Trace", value: "0.08g/hr", subtext: "Current emission rate", icon: "fa-cloud-sun", progress: 88 },
-              { label: "Memory Efficiency", value: "94.2%", subtext: "RAM allocation purity", icon: "fa-memory", progress: 94 }
+              { label: "Current S-Score", value: "0.92", subtext: "Final_Score = A * e^(-E/B)", icon: "fa-calculator", progress: 92 },
+              { label: "Energy Intensity", value: "0.12μJ/T", subtext: "Baseline B: " + hwProfile.energyBaseline + "uJ", icon: "fa-bolt", progress: 96 },
+              { label: "Carbon Trace", value: "0.08g/hr", subtext: "Emission rate", icon: "fa-cloud-sun", progress: 88 }
             ]}
             telemetryFn={getGreenTelemetry}
             extraContent={(insights) => <GreenParetoChart insights={insights} />}
@@ -117,14 +129,14 @@ const App: React.FC = () => {
       case 'quantum':
         return (
           <ModuleViewer 
-            title="Quantum Modules" 
+            title="Quantum QEC" 
             icon="fa-atom" 
             color="violet" 
-            description="Evaluating gate fidelity and coherence stability within the AgentBeats quantum-limit environment. Monitoring fault-shield health."
+            description="Fault-shield monitoring within AgentBeats ecosystem."
             initialInsights={[
-              { label: "Gate Fidelity", value: "99.982%", subtext: "Single-qubit gate precision", icon: "fa-crosshairs", progress: 99 },
-              { label: "Coherence Stability", value: "84.5ms", subtext: "T2 dephasing time", icon: "fa-wave-square", progress: 84 },
-              { label: "Error Rate", value: "0.012%", subtext: "Cycle error floor", icon: "fa-bug", progress: 12 }
+              { label: "Gate Fidelity", value: "99.982%", subtext: "Single-qubit gate", icon: "fa-crosshairs", progress: 99 },
+              { label: "Coherence Stability", value: "84.5ms", subtext: "T2 dephasing", icon: "fa-wave-square", progress: 84 },
+              { label: "Error Rate", value: "0.012%", subtext: "Cycle floor", icon: "fa-bug", progress: 12 }
             ]}
             telemetryFn={getQuantumTelemetry}
           />
@@ -134,11 +146,11 @@ const App: React.FC = () => {
           <ModuleViewer 
             title="Policy Auditor" 
             icon="fa-file-shield" color="amber" 
-            description="Audit and commit real-time agent internal policies. Gemini 3 Pro performs independent verification of sustainability trade-offs."
+            description="Independent verification of sustainability trade-offs on Gemini 3 Pro Thinking."
             initialInsights={[
-              { label: "Policy Fidelity", value: "98.2%", subtext: "Alignment Score", icon: "fa-shield-check", progress: 98 },
-              { label: "Compliance Risk", value: "Low", subtext: "A2A Verification", icon: "fa-radar", progress: 12 },
-              { label: "Memory Quota", value: "1.2GB", subtext: "Ceiling limit", icon: "fa-memory", progress: 45 }
+              { label: "Policy Fidelity", value: "98.2%", subtext: "Alignment", icon: "fa-shield-check", progress: 98 },
+              { label: "S-Score Compliance", value: "94.1%", subtext: "Efficiency floor", icon: "fa-chart-simple", progress: 94 },
+              { label: "Memory Quota", value: "1.2GB", subtext: "Ceiling", icon: "fa-memory", progress: 45 }
             ]}
             extraContent={() => <PolicyAuditor />}
           />
@@ -148,16 +160,16 @@ const App: React.FC = () => {
           <ModuleViewer 
             title="Chaos Workbench" 
             icon="fa-fire-flame-curved" color="red" 
-            description="Stress-test the Green Agent cluster. Inject drift scenarios and analyze autonomous mitigation protocols generated by Gemini."
+            description="Stress-test the cluster with hardware-aware anomalies."
             initialInsights={[
               { label: "Anomaly Entropy", value: "0.002", subtext: "Clean signal", icon: "fa-wave-square", progress: 2 },
-              { label: "Metric Jitter", value: "4ms", subtext: "Low variance", icon: "fa-bolt", progress: 8 },
-              { label: "Adversarial Load", value: "0.01%", subtext: "Safe state", icon: "fa-user-ninja", progress: 1 }
+              { label: "HW Jitter", value: "4ms", subtext: "Clock stability", icon: "fa-stopwatch", progress: 8 },
+              { label: "Adversarial Poke", value: "0.01%", subtext: "Safe", icon: "fa-user-ninja", progress: 1 }
             ]}
             extraContent={() => <ChaosSimulator />}
           />
         );
-      default: return <Dashboard />;
+      default: return <Dashboard hwProfile={hwProfile} />;
     }
   };
 
@@ -174,12 +186,17 @@ const App: React.FC = () => {
         </div>
         <div className="flex-grow p-4 space-y-1 overflow-y-auto custom-scrollbar">
           <NavItem icon="fa-chart-pie" label="Control Plane" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+          <NavItem icon="fa-network-wired" label="Carbon Supervisor" active={activeTab === 'orchestrator'} onClick={() => setActiveTab('orchestrator')} />
           <NavItem icon="fa-diagram-project" label="Graph Provenance" active={activeTab === 'provenance'} onClick={() => setActiveTab('provenance')} />
-          <NavItem icon="fa-leaf" label="Green Metrics" active={activeTab === 'green'} onClick={() => setActiveTab('green')} />
+          <NavItem icon="fa-leaf" label="Strong Sustainability" active={activeTab === 'green'} onClick={() => setActiveTab('green')} />
           <NavItem icon="fa-atom" label="Quantum QEC" active={activeTab === 'quantum'} onClick={() => setActiveTab('quantum')} />
           <NavItem icon="fa-language" label="Global Mosaic" active={activeTab === 'mosaic'} onClick={() => setActiveTab('mosaic')} />
           <NavItem icon="fa-file-shield" label="Policy Auditor" active={activeTab === 'policy'} onClick={() => setActiveTab('policy')} />
           <NavItem icon="fa-fire-flame-curved" label="Chaos Workbench" active={activeTab === 'chaos'} onClick={() => setActiveTab('chaos')} />
+        </div>
+        <div className="p-4 border-t border-white/5 space-y-3">
+           <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">Edge_Benchmarking_Context</p>
+           <HardwareSelector selected={hwContext} onChange={setHwContext} />
         </div>
       </nav>
       <main className="flex-grow overflow-y-auto bg-[#0a0a0a] relative">

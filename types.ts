@@ -1,22 +1,47 @@
 
+export type HardwareType = 'H100_Cluster' | 'Jetson_Orin' | 'Edge_TPU';
+
+export interface HardwareProfile {
+  type: HardwareType;
+  energyBaseline: number; // The 'B' in the S-Score formula
+  carbonFootprintPerWH: number;
+}
+
 export interface AgentBenchmark {
   id: string;
   name: string;
   version: string;
   greenScore: number; 
+  sScore: number; // Strong Sustainability Score
   quantumErrorCorrection: number; 
   provenanceClarity: number; 
   multilingualReach: number; 
   latency: number; 
   energyPerToken: number; 
-  carbonIntensity: number; // gCO2eq
-  memoryEfficiency: number; // 0-100 score
+  carbonIntensity: number; 
+  memoryEfficiency: number;
+  hwProfile?: HardwareType;
+}
+
+export interface SubTask {
+  id: string;
+  label: string;
+  assignedAgentId: string;
+  estimatedEnergy: number;
+  estimatedCarbon: number;
+  scope3Penalty: number;
+}
+
+export interface OrchestrationPlan {
+  totalEstimatedCarbon: string;
+  reasoning: string;
+  subtasks: SubTask[];
 }
 
 export interface GraphNode {
   id: string;
   label: string;
-  type: 'quantum' | 'agent' | 'error' | 'provenance' | 'policy';
+  type: 'quantum' | 'agent' | 'error' | 'provenance' | 'policy' | 'hardware';
   val: number;
 }
 
@@ -48,13 +73,13 @@ export interface A2AResponse {
       carbon_intensity_g: number;
       latency_ms: number;
       memory_peak_mb: number;
+      scope3_penalty: number;
     };
     metadata: {
       timestamp: string;
       agent_id: string;
+      s_score: number;
     };
   };
-  policy_feedback?: string;
-  chaos_alert?: string;
   reasoning_log: string;
 }

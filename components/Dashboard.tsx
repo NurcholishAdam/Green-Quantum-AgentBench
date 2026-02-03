@@ -4,17 +4,23 @@ import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer 
 } from 'recharts';
 import { MOCK_AGENTS } from '../constants';
-import { AgentBenchmark, QuantumGraphData, A2ARequest, A2AResponse } from '../types';
+import { AgentBenchmark, QuantumGraphData, A2ARequest, A2AResponse, HardwareProfile } from '../types';
 import QuantumGraph from './QuantumGraph';
+// Fix: All imported members are now defined in geminiService
 import { 
   getPolicyFeedback, 
   getPolicyReporter, 
   getChaosNotice, 
   SearchResult, 
-  processA2ATask
+  processA2ATask,
+  calculateSScore
 } from '../services/geminiService';
 
-const Dashboard: React.FC = () => {
+interface Props {
+  hwProfile: HardwareProfile;
+}
+
+const Dashboard: React.FC<Props> = ({ hwProfile }) => {
   const [selectedAgentId, setSelectedAgentId] = useState<string>(MOCK_AGENTS[0].id);
   const [isProcessingA2A, setIsProcessingA2A] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
@@ -30,12 +36,15 @@ const Dashboard: React.FC = () => {
     MOCK_AGENTS.find(a => a.id === selectedAgentId) || MOCK_AGENTS[0], 
   [selectedAgentId]);
 
-  // Handle Chaos Notice monitoring
+  // Derived S-Score calculation
+  const sScore = useMemo(() => {
+    return calculateSScore(selectedAgent.greenScore, selectedAgent.energyPerToken, hwProfile.energyBaseline);
+  }, [selectedAgent, hwProfile]);
+
   useEffect(() => {
     const monitorChaos = async () => {
       const notice = await getChaosNotice(selectedAgent);
       setChaosNotice(notice);
-      // Auto-clear after a few seconds or show persistent alert
     };
     monitorChaos();
     const interval = setInterval(monitorChaos, 15000);
@@ -53,42 +62,32 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const handleFetchReport = async () => {
-    setIsSearching(true);
-    try {
-      const report = await getPolicyReporter(selectedAgent.name);
-      setPolicyReporter(report);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
   const radarData = useMemo(() => [
     { subject: 'Latency', A: (1 - selectedAgent.latency / 500) * 100 },
     { subject: 'Energy', A: (1 - selectedAgent.energyPerToken) * 100 },
     { subject: 'Carbon', A: (1 - selectedAgent.carbonIntensity) * 100 },
     { subject: 'Memory', A: selectedAgent.memoryEfficiency },
     { subject: 'QEC', A: selectedAgent.quantumErrorCorrection },
-  ], [selectedAgent]);
+    { subject: 'S-Score', A: sScore },
+  ], [selectedAgent, sScore]);
 
   const graphData: QuantumGraphData = useMemo(() => ({
     nodes: [
-      { id: 'p1', label: 'Green Policy', type: 'policy', val: 90 },
-      { id: 'a1', label: 'Agent Core', type: 'agent', val: 80 },
-      { id: 'q1', label: 'Quantum Opt', type: 'quantum', val: 70 },
-      { id: 'e1', label: 'Fault Shield', type: 'error', val: 60 }
+      { id: 'hw', label: hwProfile.type, type: 'hardware', val: 100 },
+      { id: 'p1', label: 'Strong Sustainability', type: 'policy', val: sScore },
+      { id: 'a1', label: selectedAgent.name, type: 'agent', val: selectedAgent.greenScore },
+      { id: 'q1', label: 'Quantum Opt', type: 'quantum', val: 70 }
     ],
     links: [
-      { source: 'p1', target: 'a1', weight: 20 },
-      { source: 'a1', target: 'q1', weight: 15 },
-      { source: 'q1', target: 'e1', weight: 10 }
+      { source: 'hw', target: 'a1', weight: 25 },
+      { source: 'a1', target: 'p1', weight: 20 },
+      { source: 'p1', target: 'q1', weight: 15 }
     ]
-  }), []);
+  }), [selectedAgent, hwProfile, sScore]);
 
   return (
     <div className="p-4 md:p-8 space-y-8 animate-in fade-in duration-1000 max-w-[1600px] mx-auto">
       
-      {/* Chaos Notice Bar */}
       {chaosNotice && (
         <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-2xl flex items-center gap-4 animate-bounce-short">
            <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-500 shadow-lg shadow-amber-500/10">
@@ -105,15 +104,16 @@ const Dashboard: React.FC = () => {
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-[9px] font-bold border border-emerald-500/20 rounded uppercase tracking-tighter">
-              GREEN_AGENT_ARCHITECTURE_V3
+              {hwProfile.type} // CONTEXT_ACTIVE
             </span>
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           </div>
-          <h1 className="text-5xl font-black bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-amber-500 tracking-tighter italic">
-            Control Plane Dashboard
+          <h1 className="text-5xl font-black bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-blue-400 to-amber-500 tracking-tighter italic">
+            Carbon Control Plane
           </h1>
+          {/* Fix: Wrapped formula in string literal to prevent JSX from evaluating {E/B} as code */}
           <p className="text-gray-400 text-sm max-w-2xl font-light">
-            Latency, Energy, Carbon, Memory: The primary quadrant of sustainable agentic reasoning.
+            Strong Sustainability Metric (S-Score): {"$S = A \\cdot e^{-(E/B)}$"} implemented on <span className="text-emerald-500 font-bold">{hwProfile.type}</span>.
           </p>
         </div>
         
@@ -136,10 +136,9 @@ const Dashboard: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        {/* Policy & Performance Column */}
         <div className="lg:col-span-3 space-y-6">
           <div className="bg-[#111] border border-white/5 p-6 rounded-3xl shadow-xl">
-             <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-6 border-b border-white/5 pb-2">Sustainability Quadrant</h3>
+             <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-6 border-b border-white/5 pb-2">Sustainability Radar</h3>
              <ResponsiveContainer width="100%" height={240}>
                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
                   <PolarGrid stroke="#222" />
@@ -149,29 +148,26 @@ const Dashboard: React.FC = () => {
              </ResponsiveContainer>
           </div>
 
+          <div className="bg-emerald-500/5 border border-emerald-500/20 p-8 rounded-3xl text-center">
+             <div className="text-6xl font-black text-white tracking-tighter mb-1">{sScore.toFixed(1)}</div>
+             <div className="text-[10px] text-emerald-500 font-black uppercase tracking-widest">Active_S_Score</div>
+             <div className="text-[9px] text-gray-600 mt-2 font-mono italic">Penalized for Hardware Baseline B={hwProfile.energyBaseline}</div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
              <MetricBox label="Latency" val={`${selectedAgent.latency}ms`} color="blue" />
              <MetricBox label="Energy" val={`${selectedAgent.energyPerToken}μJ`} color="emerald" />
              <MetricBox label="Carbon" val={`${selectedAgent.carbonIntensity}g`} color="amber" />
              <MetricBox label="Memory" val={`${selectedAgent.memoryEfficiency}%`} color="violet" />
           </div>
-
-          <button 
-            onClick={handleFetchReport}
-            className="w-full py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-emerald-400 transition-all flex items-center justify-center gap-3"
-          >
-            {isSearching ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-file-chart-column"></i>}
-            Generate Policy Reporter
-          </button>
         </div>
 
-        {/* Execution & Feedback Column */}
         <div className="lg:col-span-6 space-y-6">
           <div className="bg-[#111] border border-white/5 p-8 rounded-3xl relative shadow-2xl space-y-6">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-3 italic">
                 <i className="fa-solid fa-handshake-angle text-emerald-500"></i>
-                Policy Execution Handshake
+                Supervisor Context Injection
               </h3>
               <button 
                 onClick={handlePolicyFeedback}
@@ -179,7 +175,7 @@ const Dashboard: React.FC = () => {
                 className="bg-amber-600/10 hover:bg-amber-600/20 text-amber-400 border border-amber-500/20 px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2"
               >
                 {isThinking ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-brain"></i>}
-                POLICY_FEEDBACK
+                ANALYZE_EMISSIONS
               </button>
             </div>
             
@@ -194,58 +190,33 @@ const Dashboard: React.FC = () => {
               <div className="bg-amber-900/10 border border-amber-500/20 p-6 rounded-2xl animate-in slide-in-from-top-4">
                  <div className="flex items-center gap-3 mb-4">
                     <i className="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
-                    <h4 className="text-[11px] font-black text-amber-300 uppercase tracking-widest">Independent Critique [Thinking Mode]</h4>
+                    <h4 className="text-[11px] font-black text-amber-300 uppercase tracking-widest">Supervisor_Critique [Thinking Mode]</h4>
                  </div>
                  <div className="text-[11px] text-gray-400 leading-relaxed italic whitespace-pre-wrap font-serif">
                     {policyFeedback}
                  </div>
               </div>
             )}
-
-            <div className="flex justify-end">
-               <button 
-                onClick={async () => {
-                  setIsProcessingA2A(true);
-                  try {
-                    const res = await processA2ATask({task_id: "GA-1", instruction: a2aInstruction, constraints: []}, selectedAgent);
-                    setA2aResponse(res);
-                  } finally { setIsProcessingA2A(false); }
-                }}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-xl text-[10px] font-black shadow-xl"
-               >
-                 {isProcessingA2A ? 'CALCULATING_PARETO...' : 'EXECUTE_GREEN_POLICY'}
-               </button>
-            </div>
           </div>
           
           <QuantumGraph data={graphData} />
         </div>
 
-        {/* Policy Reporter Column */}
         <div className="lg:col-span-3 space-y-6">
           <div className="bg-[#111] border border-white/5 p-6 rounded-3xl shadow-xl h-full flex flex-col">
             <h3 className="text-xs font-black text-emerald-400 uppercase tracking-widest border-b border-white/5 pb-4 flex justify-between items-center">
-              Policy Reporter
+              Scope 3 Ticker
               <i className="fa-brands fa-google text-blue-400 opacity-30"></i>
             </h3>
-            <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar space-y-6 pt-4">
-              {policyReporter ? (
-                <div className="space-y-6 animate-in fade-in">
-                  <p className="text-[11px] text-gray-400 font-light leading-relaxed">{policyReporter.text}</p>
-                  <div className="space-y-2">
-                    {policyReporter.sources.map((src, i) => (
-                      <a key={i} href={src.uri} target="_blank" className="block text-[9px] text-blue-400/80 bg-blue-500/5 p-3 rounded-xl border border-blue-500/10 truncate hover:bg-blue-500/10 font-mono">
-                        <i className="fa-solid fa-link mr-2"></i> {src.title || "Policy Standard Node"}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center opacity-10 space-y-4 py-20">
-                  <i className="fa-solid fa-file-shield text-5xl"></i>
-                  <p className="text-[9px] text-center px-8 uppercase tracking-[0.4em]">Awaiting Policy Report Generation...</p>
-                </div>
-              )}
+            <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar space-y-4 pt-4">
+               <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-2xl">
+                  <div className="text-[8px] font-black text-red-500 uppercase mb-1">External_Network_Hop</div>
+                  <div className="text-xs text-gray-400 italic">Simulated Search: +0.05g CO2eq</div>
+               </div>
+               <div className="p-4 bg-white/5 border border-white/10 rounded-2xl opacity-40">
+                  <div className="text-[8px] font-black text-gray-500 uppercase mb-1">Datacenter_Cooling_Tax</div>
+                  <div className="text-xs text-gray-600 italic">Regional Coefficient: 1.14x</div>
+               </div>
             </div>
           </div>
         </div>
