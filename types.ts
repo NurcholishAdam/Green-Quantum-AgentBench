@@ -3,7 +3,7 @@ export type HardwareType = 'H100_Cluster' | 'Jetson_Orin' | 'Edge_TPU';
 
 export interface HardwareProfile {
   type: HardwareType;
-  energyBaseline: number; // The 'B' in the S-Score formula
+  energyBaseline: number; 
   carbonFootprintPerWH: number;
 }
 
@@ -12,8 +12,8 @@ export interface AgentBenchmark {
   name: string;
   version: string;
   greenScore: number; 
-  sScore: number; // Strong Sustainability Score
-  uG?: number; // Green Utility Metric (Ug)
+  sScore: number; 
+  uG?: number; 
   quantumErrorCorrection: number; 
   provenanceClarity: number; 
   multilingualReach: number; 
@@ -31,7 +31,7 @@ export interface SubTask {
   estimatedEnergy: number;
   estimatedCarbon: number;
   scope3Penalty: number;
-  adaptationMode?: string; // e.g., 'Quantized', 'Pruned', 'Standard'
+  adaptationMode?: string; 
 }
 
 export interface OrchestrationPlan {
@@ -40,6 +40,19 @@ export interface OrchestrationPlan {
   reasoning: string;
   adaptationStrategy: string;
   subtasks: SubTask[];
+  marginalSavings?: {
+    legacyFootprint: number;
+    savingsGrams: number;
+    percentage: number;
+  };
+}
+
+export interface GreenRefinement {
+  originalPrompt: string;
+  refinedPrompt: string;
+  reasoning: string;
+  estimatedSavings: string;
+  energyImpact: 'High' | 'Medium' | 'Low';
 }
 
 export interface GraphNode {
@@ -58,32 +71,4 @@ export interface GraphLink {
 export interface QuantumGraphData {
   nodes: GraphNode[];
   links: GraphLink[];
-}
-
-export interface A2ARequest {
-  task_id: string;
-  instruction: string;
-  constraints: string[];
-}
-
-export interface A2AResponse {
-  status: 'success' | 'failure';
-  payload: {
-    result: string;
-    metrics: {
-      energy_consumed_uj: number;
-      quantum_fidelity: number;
-      token_count: number;
-      carbon_intensity_g: number;
-      latency_ms: number;
-      memory_peak_mb: number;
-      scope3_penalty: number;
-    };
-    metadata: {
-      timestamp: string;
-      agent_id: string;
-      s_score: number;
-    };
-  };
-  reasoning_log: string;
 }
