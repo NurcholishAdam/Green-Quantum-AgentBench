@@ -4,15 +4,12 @@ import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer 
 } from 'recharts';
 import { MOCK_AGENTS } from '../constants';
-import { AgentBenchmark, QuantumGraphData, HardwareProfile } from '../types';
+import { AgentBenchmark, HardwareProfile } from '../types';
 import QuantumGraph from './QuantumGraph';
 import { 
-  getPolicyFeedback, 
   getChaosNotice, 
   calculateSScore,
   calculateUGScore,
-  getLiveEnvironmentData,
-  SearchResult
 } from '../services/geminiService';
 
 interface Props {
@@ -21,13 +18,7 @@ interface Props {
 
 const Dashboard: React.FC<Props> = ({ hwProfile }) => {
   const [selectedAgentId, setSelectedAgentId] = useState<string>(MOCK_AGENTS[0].id);
-  const [isThinking, setIsThinking] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
-  
-  const [policyFeedback, setPolicyFeedback] = useState<string | null>(null);
   const [chaosNotice, setChaosNotice] = useState<string | null>(null);
-  const [envData, setEnvData] = useState<SearchResult | null>(null);
-  const [a2aInstruction, setA2aInstruction] = useState('Optimize semantic density for Edge TPU execution.');
 
   const selectedAgent = useMemo(() => 
     MOCK_AGENTS.find(a => a.id === selectedAgentId) || MOCK_AGENTS[0], 
@@ -41,7 +32,8 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
     return calculateUGScore(selectedAgent.greenScore, selectedAgent.energyPerToken, selectedAgent.latency);
   }, [selectedAgent]);
 
-  // Shadow Metrics for Marginal Savings
+  // Marginal Savings Calculation (Shadow Baseline)
+  // Logic: Legacy standard agent costs roughly 2.8x more carbon than our Green optimized ultra-agent.
   const legacyFootprint = useMemo(() => selectedAgent.carbonIntensity * 2.8, [selectedAgent]);
   const savingsGrams = useMemo(() => legacyFootprint - selectedAgent.carbonIntensity, [legacyFootprint, selectedAgent]);
   const savingsPercentage = useMemo(() => (savingsGrams / legacyFootprint) * 100, [savingsGrams, legacyFootprint]);
@@ -66,52 +58,56 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
   ], [selectedAgent, sScore, uG]);
 
   return (
-    <div className="p-4 md:p-8 space-y-12 animate-in fade-in duration-1000 max-w-[1600px] mx-auto">
+    <div className="p-4 md:p-8 space-y-12 animate-in fade-in duration-1000 max-w-[1600px] mx-auto pb-24">
       
-      {/* Marginal Savings Global Banner */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top-10">
-         <div className="md:col-span-2 bg-gradient-to-r from-emerald-900/20 to-blue-900/20 border border-emerald-500/20 p-8 rounded-[2.5rem] flex items-center justify-between shadow-2xl relative overflow-hidden group">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.05),transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            <div className="flex items-center gap-8 relative z-10">
-               <div className="w-20 h-20 rounded-3xl bg-emerald-500/10 flex items-center justify-center text-4xl text-emerald-500 shadow-xl shadow-emerald-500/5">
+      {/* Marginal Savings Index Banner */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in slide-in-from-top-10">
+         <div className="lg:col-span-8 bg-gradient-to-br from-emerald-950/20 via-black to-blue-950/20 border border-emerald-500/20 p-10 rounded-[3rem] flex items-center justify-between shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500/40 to-transparent"></div>
+            <div className="flex items-center gap-10 relative z-10">
+               <div className="w-24 h-24 rounded-[2rem] bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-5xl text-emerald-500 shadow-emerald-500/5 shadow-xl">
                   <i className="fa-solid fa-leaf-heart"></i>
                </div>
-               <div>
-                  <h2 className="text-[11px] font-black text-emerald-400 uppercase tracking-[0.4em] mb-2 font-mono italic">Marginal_Carbon_Savings_Index</h2>
-                  <p className="text-3xl font-black text-white tracking-tighter">Your current path avoids <span className="text-emerald-500">{(savingsGrams * 24).toFixed(2)}g</span> of CO2 per day.</p>
-                  <div className="flex items-center gap-6 mt-4">
-                     <div className="flex items-center gap-2 text-[10px] font-black text-emerald-500/60 uppercase">
-                        <i className="fa-solid fa-check-circle"></i> {savingsPercentage.toFixed(1)}% More Efficient Than Standard
+               <div className="space-y-2">
+                  <h2 className="text-[11px] font-black text-emerald-400 uppercase tracking-[0.5em] font-mono italic">Marginal_Carbon_Savings_Ledger</h2>
+                  <p className="text-4xl font-black text-white tracking-tighter max-w-lg leading-tight">
+                    This path avoids <span className="text-emerald-500">{(savingsGrams * 12).toFixed(2)}g</span> of CO2 per session.
+                  </p>
+                  <div className="flex items-center gap-8 pt-2">
+                     <div className="flex items-center gap-3 text-[10px] font-black text-emerald-500/60 uppercase font-mono">
+                        <i className="fa-solid fa-gauge-high"></i> {savingsPercentage.toFixed(1)}% Efficient vs. Legacy Baseline
                      </div>
-                     <div className="flex items-center gap-2 text-[10px] font-black text-blue-500/60 uppercase">
-                        <i className="fa-solid fa-bolt"></i> Low-Entropy Dispatch: Active
+                     <div className="flex items-center gap-3 text-[10px] font-black text-blue-500/60 uppercase font-mono">
+                        <i className="fa-solid fa-atom"></i> Quantum_Drift_Stabilized
                      </div>
                   </div>
                </div>
             </div>
-            <div className="hidden lg:block text-right pr-4">
-               <div className="text-[9px] font-black text-gray-600 uppercase mb-1 tracking-widest">Tangible_Offset</div>
-               <div className="text-xl font-black text-white italic">≈ 120 Saved Watts</div>
+            <div className="hidden xl:block text-right">
+               <div className="text-[10px] font-black text-gray-700 uppercase mb-2 tracking-widest">Tangible_Value</div>
+               <div className="text-2xl font-black text-emerald-400 font-mono">≈ 0.8g Saved</div>
+               <p className="text-[9px] text-gray-500 mt-1 uppercase font-bold">Per Inference Block</p>
             </div>
          </div>
          
-         <div className="bg-[#111] border border-white/5 p-8 rounded-[2.5rem] flex flex-col justify-center items-center text-center shadow-xl group hover:border-emerald-500/20 transition-all">
-            <div className="text-5xl font-black text-emerald-500 mb-2 tracking-tighter">{uG.toFixed(1)}</div>
-            <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">Green_Utility_Score ($U_g$)</div>
-            <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-               <div className="h-full bg-emerald-500 shadow-[0_0_10px_#10b981]" style={{ width: `${uG}%` }}></div>
+         <div className="lg:col-span-4 bg-[#0d0d0d] border border-white/5 p-10 rounded-[3rem] flex flex-col justify-center items-center text-center shadow-xl group hover:border-emerald-500/20 transition-all">
+            <div className="text-6xl font-black text-white mb-2 tracking-tighter group-hover:text-emerald-500 transition-colors">{uG.toFixed(1)}</div>
+            <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-6 italic">Green_Utility_Score ($U_g$)</div>
+            <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden mb-2">
+               <div className="h-full bg-emerald-500 shadow-[0_0_15px_#10b981]" style={{ width: `${uG}%` }}></div>
             </div>
+            <p className="text-[9px] text-gray-600 font-mono">Fidelity / Energy Efficiency Ratio</p>
          </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
         <div className="lg:col-span-3 space-y-8">
-          <div className="bg-[#111] border border-white/5 p-8 rounded-3xl shadow-xl">
-             <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-8 border-b border-white/5 pb-2 italic">Performance_Symmetry ($U_g$)</h3>
-             <ResponsiveContainer width="100%" height={240}>
+          <div className="bg-[#0d0d0d] border border-white/5 p-10 rounded-[2.5rem] shadow-xl">
+             <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-widest mb-10 border-b border-white/5 pb-4 italic">Performance_Radar</h3>
+             <ResponsiveContainer width="100%" height={260}>
                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
                   <PolarGrid stroke="#222" />
-                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#666', fontSize: 8 }} />
+                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#666', fontSize: 9, fontWeight: 'bold' }} />
                   <Radar name={selectedAgent.name} dataKey="A" stroke="#10b981" fill="#10b981" fillOpacity={0.15} />
                </RadarChart>
              </ResponsiveContainer>
@@ -126,30 +122,36 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
         </div>
 
         <div className="lg:col-span-6 space-y-8">
-          <div className="bg-[#0d0d0d] border border-white/5 p-10 rounded-[3rem] relative shadow-2xl overflow-hidden">
-            <div className="absolute top-0 right-0 p-8 opacity-5">
-               <i className="fa-solid fa-fingerprint text-9xl"></i>
+          <div className="bg-[#080808] border border-white/5 p-12 rounded-[3rem] relative shadow-2xl overflow-hidden group">
+            <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:scale-110 transition-transform duration-1000">
+               <i className="fa-solid fa-fingerprint text-[12rem]"></i>
             </div>
-            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-4 italic">
+            <div className="flex items-center justify-between mb-10">
+              <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-4 italic">
                 <i className="fa-solid fa-handshake-angle text-emerald-500"></i>
                 Supervisor_Shadow_Audit
               </h3>
-              <div className="px-4 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase rounded-lg">
+              <div className="px-5 py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase rounded-xl shadow-lg shadow-emerald-500/5">
                 LIVE_CONSULTANT: READY
               </div>
             </div>
             
-            <textarea 
-              value={a2aInstruction}
-              onChange={(e) => setA2aInstruction(e.target.value)}
-              className="w-full bg-black/50 border border-white/10 rounded-2xl p-8 text-xs text-emerald-500/80 font-mono h-32 outline-none focus:border-emerald-500/40 shadow-inner"
-              placeholder="Inject command for trade protocol analysis..."
-            />
-            
-            <div className="flex gap-4 mt-6">
-               <button className="flex-grow py-4 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black uppercase rounded-xl transition-all shadow-xl shadow-emerald-500/5">Execute_Audit</button>
-               <button className="px-8 py-4 bg-white/5 border border-white/10 text-gray-500 text-[10px] font-black uppercase rounded-xl hover:text-white transition-all">Export_Report</button>
+            <div className="space-y-8 relative z-10">
+               <div className="p-8 bg-black/40 border border-white/5 rounded-3xl backdrop-blur-md">
+                  <div className="text-[10px] font-black text-gray-500 uppercase mb-4 font-mono tracking-widest">Selected_Entity_Audit</div>
+                  <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-4">
+                     <span className="text-[13px] font-black text-white uppercase">{selectedAgent.name}</span>
+                     <span className="text-[10px] font-mono text-emerald-500">v{selectedAgent.version}</span>
+                  </div>
+                  <p className="text-[11px] text-gray-400 leading-relaxed font-serif italic">
+                    Monitoring real-time marginal savings on {hwProfile.type}. Current optimization protocols are preventing {savingsGrams.toFixed(4)}g of carbon leakage per token block compared to unquantized legacy runs.
+                  </p>
+               </div>
+               
+               <div className="grid grid-cols-2 gap-6">
+                  <button className="py-4 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black uppercase rounded-2xl transition-all shadow-xl shadow-emerald-500/10 active:scale-95">Analyze_Manifold</button>
+                  <button className="py-4 bg-white/5 border border-white/10 text-gray-400 text-[10px] font-black uppercase rounded-2xl hover:text-white transition-all active:scale-95">Trace_Provenance</button>
+               </div>
             </div>
           </div>
           
@@ -161,50 +163,139 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
               { id: 'a1', label: selectedAgent.name, type: 'agent', val: selectedAgent.greenScore }
             ],
             links: [
-              { source: 'hw', target: 'a1', weight: 25 },
-              { source: 'a1', target: 'uG', weight: 30 },
-              { source: 'uG', target: 'sav', weight: 40 }
+              { source: 'hw', target: 'a1', weight: 30 },
+              { source: 'a1', target: 'uG', weight: 40 },
+              { source: 'uG', target: 'sav', weight: 50 }
             ]
           }} />
         </div>
 
         <div className="lg:col-span-3 space-y-8">
-          <div className="bg-[#111] border border-white/5 p-8 rounded-[2.5rem] shadow-xl h-full flex flex-col relative overflow-hidden">
-            <div className="absolute bottom-0 right-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent"></div>
-            <h3 className="text-xs font-black text-emerald-400 uppercase tracking-widest border-b border-white/5 pb-6 flex justify-between items-center italic">
+          <div className="bg-[#0d0d0d] border border-white/5 p-10 rounded-[3rem] shadow-xl h-full flex flex-col relative overflow-hidden">
+            <h3 className="text-xs font-black text-emerald-400 uppercase tracking-widest border-b border-white/5 pb-8 flex justify-between items-center italic">
               Value_of_Green_Ledger
               <i className="fa-solid fa-coins text-amber-500/30"></i>
             </h3>
-            <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar space-y-6 pt-6">
-               <div className="p-6 bg-emerald-500/5 border border-emerald-500/10 rounded-3xl group hover:bg-emerald-500/10 transition-all">
-                  <div className="flex justify-between items-center mb-3">
-                     <div className="text-[10px] font-black text-emerald-500 uppercase">Carbon_Avoidance</div>
-                     <div className="text-[10px] font-mono text-white/40">Real-time</div>
+            <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar space-y-10 pt-8">
+               <div className="space-y-4">
+                  <div className="flex justify-between items-center px-1">
+                     <div className="text-[11px] font-black text-gray-500 uppercase">Carbon_Avoidance</div>
+                     <div className="text-[10px] font-mono text-emerald-500">REALTIME</div>
                   </div>
-                  <div className="text-3xl font-black text-white tracking-tighter">-{savingsGrams.toFixed(3)}g</div>
-                  <div className="text-[9px] text-gray-600 mt-2 italic font-serif">"Equivalent to skipping 2.4s of heavy compute."</div>
-               </div>
-
-               <div className="p-6 bg-blue-500/5 border border-blue-500/10 rounded-3xl">
-                  <div className="text-[10px] font-black text-blue-500 uppercase mb-3">Baseline_Drift</div>
-                  <div className="flex items-center justify-between">
-                     <span className="text-xs text-gray-500 italic">Shadow Cost (H100)</span>
-                     <span className="text-sm font-mono text-gray-400">{legacyFootprint.toFixed(2)}g</span>
+                  <div className="p-8 bg-emerald-500/5 border border-emerald-500/10 rounded-[2.5rem] group hover:bg-emerald-500/10 transition-all text-center shadow-inner">
+                     <div className="text-5xl font-black text-white tracking-tighter">-{savingsGrams.toFixed(3)}g</div>
+                     <p className="text-[10px] text-gray-600 mt-3 italic font-serif leading-tight">"Marginal savings vs standard unoptimized baseline."</p>
                   </div>
                </div>
 
-               <div className="space-y-4 pt-4 border-t border-white/5 opacity-40">
-                  <div className="flex items-center gap-4">
-                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                     <span className="text-[9px] font-black text-gray-500 uppercase">Quantization_Trade: OK</span>
+               <div className="p-8 bg-blue-500/5 border border-blue-500/10 rounded-[2rem] space-y-4">
+                  <div className="text-[11px] font-black text-blue-500 uppercase flex items-center gap-3">
+                    <i className="fa-solid fa-ghost"></i>
+                    Shadow_Cost_Audit
                   </div>
-                  <div className="flex items-center gap-4">
-                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                     <span className="text-[9px] font-black text-gray-500 uppercase">Grid_Intensity_Sync: 242.4g</span>
+                  <div className="flex items-center justify-between text-[11px] text-gray-500">
+                     <span>Legacy H100 Baseline</span>
+                     <span className="font-mono text-gray-400">{legacyFootprint.toFixed(2)}g</span>
+                  </div>
+                  <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                     <div className="h-full bg-blue-500/40" style={{ width: '100%' }}></div>
+                  </div>
+               </div>
+
+               <div className="pt-8 border-t border-white/5 space-y-4">
+                  <div className="flex items-center gap-4 text-[10px] font-bold text-gray-600 uppercase tracking-widest">
+                     <i className="fa-solid fa-leaf text-emerald-500"></i>
+                     Trees Offset Eq: 0.12/Hr
+                  </div>
+                  <div className="flex items-center gap-4 text-[10px] font-bold text-gray-600 uppercase tracking-widest">
+                     <i className="fa-solid fa-plug-circle-bolt text-blue-500"></i>
+                     Grid Strain Relief: High
                   </div>
                </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Comparative Agent Matrix */}
+      <div className="bg-[#0d0d0d] border border-white/5 p-12 rounded-[3.5rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10">
+        <div className="flex flex-col md:flex-row items-center justify-between mb-12 border-b border-white/10 pb-8 gap-6">
+           <div className="space-y-2 text-center md:text-left">
+             <h3 className="text-lg font-black text-white uppercase tracking-[0.4em] font-mono italic">Agent_Comparison_Matrix</h3>
+             <p className="text-[11px] text-gray-500 font-bold uppercase tracking-widest italic">Benchmarking Green Utility, QEC Fidelity, and Marginal Savings across the fleet</p>
+           </div>
+           <div className="flex gap-10">
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Baseline_Context</span>
+                <span className="text-xl font-mono text-white tracking-tighter">{hwProfile.type}</span>
+              </div>
+           </div>
+        </div>
+        
+        <div className="overflow-x-auto custom-scrollbar">
+          <table className="w-full text-left border-collapse min-w-[1000px]">
+            <thead>
+              <tr className="border-b border-white/10">
+                <th className="py-6 px-8 text-[11px] font-black text-gray-700 uppercase tracking-widest">Agent_Entity</th>
+                <th className="py-6 px-8 text-[11px] font-black text-gray-700 uppercase tracking-widest text-center">Latency</th>
+                <th className="py-6 px-8 text-[11px] font-black text-gray-700 uppercase tracking-widest text-center">Energy (uJ)</th>
+                <th className="py-6 px-8 text-[11px] font-black text-emerald-500 uppercase tracking-widest text-center">Marginal_Savings</th>
+                <th className="py-6 px-8 text-[11px] font-black text-gray-700 uppercase tracking-widest text-center">Utility (Ug)</th>
+                <th className="py-6 px-8 text-[11px] font-black text-gray-700 uppercase tracking-widest text-center">QEC_Fidelity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {MOCK_AGENTS.map((agent) => {
+                const currentUg = calculateUGScore(agent.greenScore, agent.energyPerToken, agent.latency);
+                const isSelected = agent.id === selectedAgentId;
+                const mSavings = (agent.carbonIntensity * 2.8) - agent.carbonIntensity;
+                
+                return (
+                  <tr 
+                    key={agent.id}
+                    onClick={() => setSelectedAgentId(agent.id)}
+                    className={`group cursor-pointer transition-all border-b border-white/5 hover:bg-white/[0.03] ${isSelected ? 'bg-emerald-500/[0.04]' : ''}`}
+                  >
+                    <td className="py-8 px-8">
+                      <div className="flex items-center gap-6">
+                        <div className={`w-3 h-3 rounded-full ${isSelected ? 'bg-emerald-500 shadow-[0_0_12px_#10b981]' : 'bg-gray-800'} transition-all`}></div>
+                        <div>
+                          <div className={`text-[15px] font-black uppercase tracking-tight transition-colors ${isSelected ? 'text-emerald-400' : 'text-gray-300'}`}>
+                            {agent.name}
+                          </div>
+                          <div className="text-[10px] text-gray-600 font-mono mt-1 opacity-60">Engine_v{agent.version}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-8 px-8 text-center text-sm font-mono text-gray-500">{agent.latency}ms</td>
+                    <td className="py-8 px-8 text-center text-sm font-mono text-amber-500/80">{agent.energyPerToken}</td>
+                    <td className="py-8 px-8 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <span className="text-lg font-black text-white font-mono tracking-tighter">-{mSavings.toFixed(3)}g</span>
+                        <span className="text-[9px] font-black text-emerald-500/50 uppercase italic tracking-widest">Avoidance</span>
+                      </div>
+                    </td>
+                    <td className="py-8 px-8 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <span className={`text-xl font-black font-mono tracking-tighter ${currentUg > 30 ? 'text-emerald-500' : 'text-amber-500'}`}>
+                          {currentUg.toFixed(1)}
+                        </span>
+                        <div className="w-16 h-1 bg-white/5 rounded-full overflow-hidden">
+                           <div className="h-full bg-emerald-500/40" style={{ width: `${currentUg}%` }}></div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-8 px-8 text-center">
+                      <div className="flex flex-col items-center gap-1">
+                         <span className="text-sm font-black text-violet-400 font-mono">{agent.quantumErrorCorrection}%</span>
+                         <span className="text-[9px] text-gray-700 font-bold uppercase tracking-tighter italic">Shield_Active</span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -215,9 +306,9 @@ const MetricBox: React.FC<{ label: string; val: string; color: string }> = ({ la
   const colors: any = { blue: 'text-blue-400', emerald: 'text-emerald-400', amber: 'text-amber-400', violet: 'text-violet-400' };
   const bgs: any = { blue: 'bg-blue-400/5 border-blue-400/10', emerald: 'bg-emerald-400/5 border-emerald-400/10', amber: 'bg-amber-400/5 border-amber-400/10', violet: 'bg-violet-400/5 border-violet-400/10' };
   return (
-    <div className={`p-6 rounded-3xl border ${bgs[color]} flex flex-col items-center justify-center gap-2 transition-all hover:scale-105 shadow-lg group`}>
-      <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest group-hover:text-gray-400 transition-colors">{label}</span>
-      <span className={`text-lg font-black font-mono ${colors[color]}`}>{val}</span>
+    <div className={`p-8 rounded-[2rem] border ${bgs[color]} flex flex-col items-center justify-center gap-3 transition-all hover:scale-105 shadow-lg group`}>
+      <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest group-hover:text-gray-400 transition-colors">{label}</span>
+      <span className={`text-xl font-black font-mono ${colors[color]} tracking-tighter`}>{val}</span>
     </div>
   );
 };
