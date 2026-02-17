@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer 
@@ -28,7 +27,7 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
     MOCK_AGENTS.find(a => a.id === selectedAgentId) || MOCK_AGENTS[0], 
   [selectedAgentId]);
 
-  // Sustainability Pareto & Efficiency Calculations
+  // Sustainability Pareto & Efficiency Calculations for selected agent
   const sScore = useMemo(() => {
     return calculateSScore(selectedAgent.greenScore, selectedAgent.energyPerToken, hwProfile.energyBaseline);
   }, [selectedAgent, hwProfile]);
@@ -125,7 +124,6 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
          
          <div className="lg:col-span-4 bg-[#0d0d0d] border border-white/5 p-10 rounded-[3rem] flex flex-col justify-center items-center text-center shadow-xl group hover:border-emerald-500/20 transition-all">
             <div className="text-6xl font-black text-white mb-2 tracking-tighter group-hover:text-emerald-500 transition-colors">{quantumEffMetric.toFixed(2)}</div>
-            {/* Fixed JSX error: Wrapped LaTeX-style text in braces to avoid parsing {eff} as a variable */}
             <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-6 italic">{"Quantum_E_Eff Metric ($E_{eff}$)"}</div>
             <div className="w-full h-2.5 bg-white/5 rounded-full overflow-hidden mb-2 shadow-inner">
                <div className="h-full bg-blue-500 shadow-[0_0_15px_#3b82f6]" style={{ width: `${Math.min(100, quantumEffMetric * 8)}%` }}></div>
@@ -228,17 +226,18 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
         <div className="flex flex-col md:flex-row items-center justify-between mb-12 border-b border-white/10 pb-8 gap-6">
            <div className="space-y-2 text-center md:text-left">
              <h3 className="text-lg font-black text-white uppercase tracking-[0.4em] font-mono italic">Agent_Efficiency_Matrix</h3>
-             {/* Fixed JSX error: Wrapped LaTeX-style text in braces to avoid parsing {eff} as a variable */}
              <p className="text-[11px] text-gray-500 font-bold uppercase tracking-widest italic">{"Sorted by Quantum Energy-per-Bit ($E_{eff}$)"}</p>
            </div>
         </div>
         
         <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left border-collapse min-w-[1000px]">
+          <table className="w-full text-left border-collapse min-w-[1200px]">
             <thead>
               <tr className="border-b border-white/10">
                 <th className="py-6 px-8 text-[11px] font-black text-gray-700 uppercase tracking-widest">Agent_Entity</th>
                 <th className="py-6 px-8 text-[11px] font-black text-blue-500 uppercase tracking-widest text-center">E_Eff Metric</th>
+                <th className="py-6 px-8 text-[11px] font-black text-emerald-500 uppercase tracking-widest text-center">S-Score</th>
+                <th className="py-6 px-8 text-[11px] font-black text-gray-700 uppercase tracking-widest text-center">HW Baseline</th>
                 <th className="py-6 px-8 text-[11px] font-black text-emerald-500 uppercase tracking-widest text-center">Marginal_Savings</th>
                 <th className="py-6 px-8 text-[11px] font-black text-gray-700 uppercase tracking-widest text-center">Utility (Ug)</th>
                 <th className="py-6 px-8 text-[11px] font-black text-gray-700 uppercase tracking-widest text-center">QEC_Fidelity</th>
@@ -248,6 +247,7 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
               {MOCK_AGENTS.map((agent) => {
                 const currentUg = calculateUGScore(agent.greenScore, agent.energyPerToken, agent.latency);
                 const agentEffMetric = calculateEEff(agent.greenScore, agent.energyPerToken);
+                const agentSScore = calculateSScore(agent.greenScore, agent.energyPerToken, hwProfile.energyBaseline);
                 const isSelected = agent.id === selectedAgentId;
                 const mSavings = (agent.carbonIntensity * 2.85) - agent.carbonIntensity;
                 
@@ -270,6 +270,12 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
                     </td>
                     <td className="py-8 px-8 text-center">
                        <span className="text-xl font-black text-blue-400 font-mono tracking-tighter">{agentEffMetric.toFixed(2)}</span>
+                    </td>
+                    <td className="py-8 px-8 text-center">
+                       <span className="text-xl font-black text-emerald-500 font-mono tracking-tighter">{agentSScore.toFixed(2)}</span>
+                    </td>
+                    <td className="py-8 px-8 text-center">
+                       <span className="text-sm font-black text-gray-500 font-mono">{hwProfile.energyBaseline}μJ</span>
                     </td>
                     <td className="py-8 px-8 text-center">
                       <div className="flex flex-col items-center gap-2">
