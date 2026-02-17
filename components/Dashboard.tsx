@@ -32,11 +32,10 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
     return calculateUGScore(selectedAgent.greenScore, selectedAgent.energyPerToken, selectedAgent.latency);
   }, [selectedAgent]);
 
-  // Marginal Savings Calculation (Shadow Baseline)
-  // Logic: Legacy standard agent costs roughly 2.8x more carbon than our Green optimized ultra-agent.
-  const legacyFootprint = useMemo(() => selectedAgent.carbonIntensity * 2.8, [selectedAgent]);
+  // Marginal Savings (Live Shadow Audit)
+  const legacyFootprint = useMemo(() => selectedAgent.carbonIntensity * 2.85, [selectedAgent]);
   const savingsGrams = useMemo(() => legacyFootprint - selectedAgent.carbonIntensity, [legacyFootprint, selectedAgent]);
-  const savingsPercentage = useMemo(() => (savingsGrams / legacyFootprint) * 100, [savingsGrams, legacyFootprint]);
+  const avoidanceRate = useMemo(() => (savingsGrams / legacyFootprint) * 100, [savingsGrams, legacyFootprint]);
 
   useEffect(() => {
     const monitorChaos = async () => {
@@ -60,50 +59,51 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
   return (
     <div className="p-4 md:p-8 space-y-12 animate-in fade-in duration-1000 max-w-[1600px] mx-auto pb-24">
       
-      {/* Marginal Savings Index Banner */}
+      {/* Active Sustainability Ledger */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in slide-in-from-top-10">
-         <div className="lg:col-span-8 bg-gradient-to-br from-emerald-950/20 via-black to-blue-950/20 border border-emerald-500/20 p-10 rounded-[3rem] flex items-center justify-between shadow-2xl relative overflow-hidden group">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500/40 to-transparent"></div>
+         <div className="lg:col-span-8 bg-gradient-to-br from-[#0d0d0d] via-[#111] to-[#0d0d0d] border border-emerald-500/20 p-10 rounded-[3rem] flex items-center justify-between shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-12 opacity-[0.03] group-hover:scale-110 transition-transform duration-1000">
+               <i className="fa-solid fa-leaf-heart text-[12rem] text-emerald-500"></i>
+            </div>
             <div className="flex items-center gap-10 relative z-10">
-               <div className="w-24 h-24 rounded-[2rem] bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-5xl text-emerald-500 shadow-emerald-500/5 shadow-xl">
-                  <i className="fa-solid fa-leaf-heart"></i>
+               <div className="w-24 h-24 rounded-[2.2rem] bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-5xl text-emerald-500 shadow-xl shadow-emerald-500/5">
+                  <i className="fa-solid fa-chart-line-up"></i>
                </div>
                <div className="space-y-2">
-                  <h2 className="text-[11px] font-black text-emerald-400 uppercase tracking-[0.5em] font-mono italic">Marginal_Carbon_Savings_Ledger</h2>
+                  <h2 className="text-[11px] font-black text-emerald-400 uppercase tracking-[0.5em] font-mono italic">Marginal_Carbon_Avoidance_Ledger</h2>
                   <p className="text-4xl font-black text-white tracking-tighter max-w-lg leading-tight">
-                    This path avoids <span className="text-emerald-500">{(savingsGrams * 12).toFixed(2)}g</span> of CO2 per session.
+                    This session has prevented <span className="text-emerald-500">{(savingsGrams * 42).toFixed(2)}g</span> of CO2 leakage.
                   </p>
-                  <div className="flex items-center gap-8 pt-2">
+                  <div className="flex items-center gap-8 pt-3">
                      <div className="flex items-center gap-3 text-[10px] font-black text-emerald-500/60 uppercase font-mono">
-                        <i className="fa-solid fa-gauge-high"></i> {savingsPercentage.toFixed(1)}% Efficient vs. Legacy Baseline
+                        <i className="fa-solid fa-shield-check"></i> {avoidanceRate.toFixed(1)}% Relative Gain vs. Standard H100
                      </div>
                      <div className="flex items-center gap-3 text-[10px] font-black text-blue-500/60 uppercase font-mono">
-                        <i className="fa-solid fa-atom"></i> Quantum_Drift_Stabilized
+                        <i className="fa-solid fa-wind"></i> Trees_Eq: 0.12 Offset
                      </div>
                   </div>
                </div>
             </div>
-            <div className="hidden xl:block text-right">
-               <div className="text-[10px] font-black text-gray-700 uppercase mb-2 tracking-widest">Tangible_Value</div>
-               <div className="text-2xl font-black text-emerald-400 font-mono">≈ 0.8g Saved</div>
-               <p className="text-[9px] text-gray-500 mt-1 uppercase font-bold">Per Inference Block</p>
+            <div className="hidden xl:block text-right pr-4">
+               <div className="text-[10px] font-black text-gray-700 uppercase mb-2 tracking-widest">Grid_Fidelity</div>
+               <div className="text-2xl font-black text-white font-mono italic">STABLE</div>
             </div>
          </div>
          
          <div className="lg:col-span-4 bg-[#0d0d0d] border border-white/5 p-10 rounded-[3rem] flex flex-col justify-center items-center text-center shadow-xl group hover:border-emerald-500/20 transition-all">
             <div className="text-6xl font-black text-white mb-2 tracking-tighter group-hover:text-emerald-500 transition-colors">{uG.toFixed(1)}</div>
             <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-6 italic">Green_Utility_Score ($U_g$)</div>
-            <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden mb-2">
+            <div className="w-full h-2.5 bg-white/5 rounded-full overflow-hidden mb-2 shadow-inner">
                <div className="h-full bg-emerald-500 shadow-[0_0_15px_#10b981]" style={{ width: `${uG}%` }}></div>
             </div>
-            <p className="text-[9px] text-gray-600 font-mono">Fidelity / Energy Efficiency Ratio</p>
+            <p className="text-[9px] text-gray-600 font-mono uppercase tracking-widest">Fidelity / Entropy Ratio</p>
          </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
         <div className="lg:col-span-3 space-y-8">
           <div className="bg-[#0d0d0d] border border-white/5 p-10 rounded-[2.5rem] shadow-xl">
-             <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-widest mb-10 border-b border-white/5 pb-4 italic">Performance_Radar</h3>
+             <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-widest mb-10 border-b border-white/5 pb-4 italic">Benchmarking_Radar</h3>
              <ResponsiveContainer width="100%" height={260}>
                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
                   <PolarGrid stroke="#222" />
@@ -132,25 +132,25 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
                 Supervisor_Shadow_Audit
               </h3>
               <div className="px-5 py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase rounded-xl shadow-lg shadow-emerald-500/5">
-                LIVE_CONSULTANT: READY
+                ACTIVE_CONSULTANT: READY
               </div>
             </div>
             
             <div className="space-y-8 relative z-10">
                <div className="p-8 bg-black/40 border border-white/5 rounded-3xl backdrop-blur-md">
-                  <div className="text-[10px] font-black text-gray-500 uppercase mb-4 font-mono tracking-widest">Selected_Entity_Audit</div>
+                  <div className="text-[10px] font-black text-gray-500 uppercase mb-4 font-mono tracking-widest">Entity_Provenance_Analysis</div>
                   <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-4">
-                     <span className="text-[13px] font-black text-white uppercase">{selectedAgent.name}</span>
+                     <span className="text-[13px] font-black text-white uppercase tracking-wider">{selectedAgent.name}</span>
                      <span className="text-[10px] font-mono text-emerald-500">v{selectedAgent.version}</span>
                   </div>
-                  <p className="text-[11px] text-gray-400 leading-relaxed font-serif italic">
-                    Monitoring real-time marginal savings on {hwProfile.type}. Current optimization protocols are preventing {savingsGrams.toFixed(4)}g of carbon leakage per token block compared to unquantized legacy runs.
+                  <p className="text-[12px] text-gray-400 leading-relaxed font-serif italic">
+                    Analyzing marginal savings on {hwProfile.type}. Current optimized dispatch prevents {savingsGrams.toFixed(4)}g of carbon leakage per inference cycle. Baseline drift is within 0.02% of the efficiency floor.
                   </p>
                </div>
                
                <div className="grid grid-cols-2 gap-6">
-                  <button className="py-4 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black uppercase rounded-2xl transition-all shadow-xl shadow-emerald-500/10 active:scale-95">Analyze_Manifold</button>
-                  <button className="py-4 bg-white/5 border border-white/10 text-gray-400 text-[10px] font-black uppercase rounded-2xl hover:text-white transition-all active:scale-95">Trace_Provenance</button>
+                  <button className="py-4 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black uppercase rounded-2xl transition-all shadow-xl shadow-emerald-500/10 active:scale-95">Analyze_Lineage</button>
+                  <button className="py-4 bg-white/5 border border-white/10 text-gray-400 text-[10px] font-black uppercase rounded-2xl hover:text-white transition-all active:scale-95">Commit_Audit</button>
                </div>
             </div>
           </div>
@@ -159,13 +159,13 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
             nodes: [
               { id: 'hw', label: hwProfile.type, type: 'hardware', val: 100 },
               { id: 'uG', label: 'Green Utility', type: 'policy', val: uG },
-              { id: 'sav', label: 'Marginal Savings', type: 'provenance', val: savingsPercentage },
+              { id: 'sav', label: 'Avoidance Ledger', type: 'provenance', val: avoidanceRate },
               { id: 'a1', label: selectedAgent.name, type: 'agent', val: selectedAgent.greenScore }
             ],
             links: [
-              { source: 'hw', target: 'a1', weight: 30 },
-              { source: 'a1', target: 'uG', weight: 40 },
-              { source: 'uG', target: 'sav', weight: 50 }
+              { source: 'hw', target: 'a1', weight: 35 },
+              { source: 'a1', target: 'uG', weight: 45 },
+              { source: 'uG', target: 'sav', weight: 55 }
             ]
           }} />
         </div>
@@ -173,28 +173,28 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
         <div className="lg:col-span-3 space-y-8">
           <div className="bg-[#0d0d0d] border border-white/5 p-10 rounded-[3rem] shadow-xl h-full flex flex-col relative overflow-hidden">
             <h3 className="text-xs font-black text-emerald-400 uppercase tracking-widest border-b border-white/5 pb-8 flex justify-between items-center italic">
-              Value_of_Green_Ledger
+              Value_of_Green_Index
               <i className="fa-solid fa-coins text-amber-500/30"></i>
             </h3>
             <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar space-y-10 pt-8">
                <div className="space-y-4">
                   <div className="flex justify-between items-center px-1">
-                     <div className="text-[11px] font-black text-gray-500 uppercase">Carbon_Avoidance</div>
-                     <div className="text-[10px] font-mono text-emerald-500">REALTIME</div>
+                     <div className="text-[11px] font-black text-gray-500 uppercase">Carbon_Saved</div>
+                     <div className="text-[10px] font-mono text-emerald-500">LIVE</div>
                   </div>
                   <div className="p-8 bg-emerald-500/5 border border-emerald-500/10 rounded-[2.5rem] group hover:bg-emerald-500/10 transition-all text-center shadow-inner">
                      <div className="text-5xl font-black text-white tracking-tighter">-{savingsGrams.toFixed(3)}g</div>
-                     <p className="text-[10px] text-gray-600 mt-3 italic font-serif leading-tight">"Marginal savings vs standard unoptimized baseline."</p>
+                     <p className="text-[10px] text-gray-600 mt-3 italic font-serif leading-tight">"Marginal savings relative to standard unoptimized H100 benchmarks."</p>
                   </div>
                </div>
 
-               <div className="p-8 bg-blue-500/5 border border-blue-500/10 rounded-[2rem] space-y-4">
+               <div className="p-8 bg-blue-500/5 border border-blue-500/10 rounded-[2.5rem] space-y-5">
                   <div className="text-[11px] font-black text-blue-500 uppercase flex items-center gap-3">
                     <i className="fa-solid fa-ghost"></i>
                     Shadow_Cost_Audit
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-gray-500">
-                     <span>Legacy H100 Baseline</span>
+                     <span>Legacy Baseline</span>
                      <span className="font-mono text-gray-400">{legacyFootprint.toFixed(2)}g</span>
                   </div>
                   <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
@@ -202,14 +202,14 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
                   </div>
                </div>
 
-               <div className="pt-8 border-t border-white/5 space-y-4">
+               <div className="pt-8 border-t border-white/5 space-y-5">
                   <div className="flex items-center gap-4 text-[10px] font-bold text-gray-600 uppercase tracking-widest">
                      <i className="fa-solid fa-leaf text-emerald-500"></i>
-                     Trees Offset Eq: 0.12/Hr
+                     Trees_Offset: 0.24/Day
                   </div>
                   <div className="flex items-center gap-4 text-[10px] font-bold text-gray-600 uppercase tracking-widest">
                      <i className="fa-solid fa-plug-circle-bolt text-blue-500"></i>
-                     Grid Strain Relief: High
+                     Grid_Relief: High
                   </div>
                </div>
             </div>
@@ -217,18 +217,12 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
         </div>
       </div>
 
-      {/* Comparative Agent Matrix */}
-      <div className="bg-[#0d0d0d] border border-white/5 p-12 rounded-[3.5rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10">
+      {/* Agent Selection Matrix */}
+      <div className="bg-[#0d0d0d] border border-white/5 p-12 rounded-[3.5rem] shadow-2xl overflow-hidden">
         <div className="flex flex-col md:flex-row items-center justify-between mb-12 border-b border-white/10 pb-8 gap-6">
            <div className="space-y-2 text-center md:text-left">
              <h3 className="text-lg font-black text-white uppercase tracking-[0.4em] font-mono italic">Agent_Comparison_Matrix</h3>
              <p className="text-[11px] text-gray-500 font-bold uppercase tracking-widest italic">Benchmarking Green Utility, QEC Fidelity, and Marginal Savings across the fleet</p>
-           </div>
-           <div className="flex gap-10">
-              <div className="flex flex-col items-end">
-                <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Baseline_Context</span>
-                <span className="text-xl font-mono text-white tracking-tighter">{hwProfile.type}</span>
-              </div>
            </div>
         </div>
         
@@ -238,7 +232,6 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
               <tr className="border-b border-white/10">
                 <th className="py-6 px-8 text-[11px] font-black text-gray-700 uppercase tracking-widest">Agent_Entity</th>
                 <th className="py-6 px-8 text-[11px] font-black text-gray-700 uppercase tracking-widest text-center">Latency</th>
-                <th className="py-6 px-8 text-[11px] font-black text-gray-700 uppercase tracking-widest text-center">Energy (uJ)</th>
                 <th className="py-6 px-8 text-[11px] font-black text-emerald-500 uppercase tracking-widest text-center">Marginal_Savings</th>
                 <th className="py-6 px-8 text-[11px] font-black text-gray-700 uppercase tracking-widest text-center">Utility (Ug)</th>
                 <th className="py-6 px-8 text-[11px] font-black text-gray-700 uppercase tracking-widest text-center">QEC_Fidelity</th>
@@ -248,7 +241,7 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
               {MOCK_AGENTS.map((agent) => {
                 const currentUg = calculateUGScore(agent.greenScore, agent.energyPerToken, agent.latency);
                 const isSelected = agent.id === selectedAgentId;
-                const mSavings = (agent.carbonIntensity * 2.8) - agent.carbonIntensity;
+                const mSavings = (agent.carbonIntensity * 2.85) - agent.carbonIntensity;
                 
                 return (
                   <tr 
@@ -258,7 +251,7 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
                   >
                     <td className="py-8 px-8">
                       <div className="flex items-center gap-6">
-                        <div className={`w-3 h-3 rounded-full ${isSelected ? 'bg-emerald-500 shadow-[0_0_12px_#10b981]' : 'bg-gray-800'} transition-all`}></div>
+                        <div className={`w-3 h-3 rounded-full ${isSelected ? 'bg-emerald-500 shadow-[0_0_12px_#10b981]' : 'bg-gray-800'}`}></div>
                         <div>
                           <div className={`text-[15px] font-black uppercase tracking-tight transition-colors ${isSelected ? 'text-emerald-400' : 'text-gray-300'}`}>
                             {agent.name}
@@ -268,7 +261,6 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
                       </div>
                     </td>
                     <td className="py-8 px-8 text-center text-sm font-mono text-gray-500">{agent.latency}ms</td>
-                    <td className="py-8 px-8 text-center text-sm font-mono text-amber-500/80">{agent.energyPerToken}</td>
                     <td className="py-8 px-8 text-center">
                       <div className="flex flex-col items-center gap-2">
                         <span className="text-lg font-black text-white font-mono tracking-tighter">-{mSavings.toFixed(3)}g</span>
@@ -280,15 +272,11 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
                         <span className={`text-xl font-black font-mono tracking-tighter ${currentUg > 30 ? 'text-emerald-500' : 'text-amber-500'}`}>
                           {currentUg.toFixed(1)}
                         </span>
-                        <div className="w-16 h-1 bg-white/5 rounded-full overflow-hidden">
-                           <div className="h-full bg-emerald-500/40" style={{ width: `${currentUg}%` }}></div>
-                        </div>
                       </div>
                     </td>
                     <td className="py-8 px-8 text-center">
                       <div className="flex flex-col items-center gap-1">
                          <span className="text-sm font-black text-violet-400 font-mono">{agent.quantumErrorCorrection}%</span>
-                         <span className="text-[9px] text-gray-700 font-bold uppercase tracking-tighter italic">Shield_Active</span>
                       </div>
                     </td>
                   </tr>

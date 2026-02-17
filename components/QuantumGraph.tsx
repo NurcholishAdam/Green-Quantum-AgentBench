@@ -35,7 +35,7 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
     setIsSyncing(true);
     try {
       const newData = await getGraphTelemetry(type);
-      if (newData && newData.nodes.length > 0) {
+      if (newData && newData.nodes && newData.nodes.length > 0) {
         setGraphData(newData);
       }
     } catch (err) {
@@ -47,7 +47,9 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
 
   // Sync with incoming initialData prop (important when App.tsx updates it)
   useEffect(() => {
-    setGraphData(initialData);
+    if (initialData) {
+      setGraphData(initialData);
+    }
   }, [initialData]);
 
   // Initial load and auto-refresh logic
@@ -63,7 +65,7 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
     const jitterInterval = setInterval(() => {
       setGraphData(prev => ({
         ...prev,
-        nodes: prev.nodes.map(n => ({
+        nodes: (prev.nodes || []).map(n => ({
           ...n,
           val: Math.max(10, Math.min(100, n.val + (Math.random() - 0.5) * 2))
         }))
@@ -80,9 +82,12 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
     const svg = d3.select(svgRef.current);
     const tooltip = d3.select(tooltipRef.current);
 
-    const filteredNodes = graphData.nodes.filter(n => visibleTypes.has(n.type));
+    const safeNodes = graphData.nodes || [];
+    const safeLinks = graphData.links || [];
+
+    const filteredNodes = safeNodes.filter(n => visibleTypes.has(n.type));
     const nodeIds = new Set(filteredNodes.map(n => n.id));
-    const filteredLinks = graphData.links.filter(l => {
+    const filteredLinks = safeLinks.filter(l => {
       const s = typeof l.source === 'string' ? l.source : (l.source as any).id;
       const t = typeof l.target === 'string' ? l.target : (l.target as any).id;
       return nodeIds.has(s) && nodeIds.has(t);
@@ -229,6 +234,9 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
     sim.alpha(0.15).restart();
   }, [graphData, visibleTypes]);
 
+  const nodes = graphData?.nodes || [];
+  const links = graphData?.links || [];
+
   return (
     <div className="relative w-full bg-[#0d0d0d] border border-white/5 rounded-[3rem] overflow-hidden h-[550px] shadow-[0_40px_100px_rgba(0,0,0,0.6)] flex flex-col group">
       <div ref={tooltipRef} className="pointer-events-none fixed z-[9999] opacity-0 bg-black/90 backdrop-blur-3xl border border-white/10 p-6 rounded-[2rem] shadow-2xl transition-opacity duration-300" />
@@ -284,9 +292,9 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
 
       <div className="absolute bottom-10 right-12 z-10 pointer-events-none opacity-40">
          <div className="text-[10px] font-mono text-gray-700 text-right">
-            ACTIVE_NODES: {graphData.nodes.length}<br/>
-            PATH_ENTROPY: {(1 - (graphData.links.reduce((acc, l) => acc + l.weight, 0) / (graphData.links.length * 30 || 1))).toFixed(3)}<br/>
-            FIDELITY_FLOOR: {(graphData.nodes.reduce((acc, n) => acc + n.val, 0) / graphData.nodes.length || 0).toFixed(1)}%
+            ACTIVE_NODES: {nodes.length}<br/>
+            PATH_ENTROPY: {(1 - (links.reduce((acc, l) => acc + (l.weight || 0), 0) / (links.length * 30 || 1))).toFixed(3)}<br/>
+            FIDELITY_FLOOR: {(nodes.reduce((acc, n) => acc + (n.val || 0), 0) / (nodes.length || 1)).toFixed(1)}%
          </div>
       </div>
 
