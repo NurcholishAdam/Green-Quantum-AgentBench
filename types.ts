@@ -7,6 +7,13 @@ export interface HardwareProfile {
   carbonFootprintPerWH: number;
 }
 
+export interface GridContext {
+  intensity: number; // gCO2/kWh
+  region: string;
+  status: 'Clean' | 'Balanced' | 'Dirty';
+  source?: string;
+}
+
 export interface AgentBenchmark {
   id: string;
   name: string;
@@ -14,6 +21,7 @@ export interface AgentBenchmark {
   greenScore: number; 
   sScore: number; 
   uG?: number; 
+  eEff?: number; // Energy-per-Bit Efficiency Metric
   quantumErrorCorrection: number; 
   provenanceClarity: number; 
   multilingualReach: number; 
@@ -40,6 +48,7 @@ export interface OrchestrationPlan {
   reasoning: string;
   adaptationStrategy: string;
   subtasks: SubTask[];
+  gridContext?: GridContext;
   marginalSavings?: {
     legacyFootprint: number;
     savingsGrams: number;

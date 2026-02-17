@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import Dashboard from './components/Dashboard';
 import GreenParetoChart from './components/GreenParetoChart';
 import QuantumGraph from './components/QuantumGraph';
@@ -14,10 +14,9 @@ import {
   getGreenTelemetry, 
   getGraphTelemetry,
   getProvenanceTelemetry,
-  calculateSScore
 } from './services/geminiService';
 import { QuantumGraphData, HardwareType } from './types';
-import { HARDWARE_PROFILES } from './constants';
+import { HARDWARE_PROFILES, MOCK_AGENTS } from './constants';
 
 type TabType = 'dashboard' | 'orchestrator' | 'policy' | 'chaos' | 'quantum' | 'green' | 'provenance' | 'mosaic';
 
@@ -28,6 +27,99 @@ interface Insight {
   icon: string;
   progress: number;
 }
+
+/**
+ * ModuleViewer component to wrap each dashboard section with common UI elements and telemetry.
+ */
+const ModuleViewer: React.FC<{
+  title: string;
+  icon: string;
+  color: string;
+  description: string;
+  initialInsights: Insight[];
+  telemetryFn?: (insights: Insight[]) => Promise<Insight[]>;
+  extraContent?: () => React.ReactNode;
+}> = ({ title, icon, color, description, initialInsights, telemetryFn, extraContent }) => {
+  const [insights, setInsights] = useState<Insight[]>(initialInsights);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSync = useCallback(async () => {
+    if (!telemetryFn) return;
+    setIsSyncing(true);
+    try {
+      const updated = await telemetryFn(insights);
+      if (updated) setInsights(updated);
+    } catch (err) {
+      console.error("Telemetry sync failed", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [telemetryFn, insights]);
+
+  useEffect(() => {
+    if (telemetryFn) {
+      const interval = setInterval(handleSync, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [telemetryFn, handleSync]);
+
+  const colorClasses: Record<string, string> = {
+    emerald: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5',
+    violet: 'text-violet-400 border-violet-500/20 bg-violet-500/5',
+    blue: 'text-blue-400 border-blue-500/20 bg-blue-500/5',
+    amber: 'text-amber-400 border-amber-500/20 bg-amber-500/5',
+    red: 'text-red-400 border-red-500/20 bg-red-500/5',
+  };
+
+  const progressColors: Record<string, string> = {
+    emerald: 'bg-emerald-500',
+    violet: 'bg-violet-500',
+    blue: 'bg-blue-500',
+    amber: 'bg-amber-500',
+    red: 'bg-red-500',
+  };
+
+  return (
+    <div className="p-4 md:p-8 space-y-12 animate-in fade-in duration-1000 max-w-[1600px] mx-auto pb-24">
+      <div className={`p-10 rounded-[3rem] border ${colorClasses[color]} relative overflow-hidden group shadow-2xl`}>
+        <div className="absolute top-0 right-0 p-12 opacity-5 group-hover:scale-110 transition-transform duration-1000">
+          <i className={`fa-solid ${icon} text-[10rem]`}></i>
+        </div>
+        <div className="relative z-10 space-y-4">
+          <div className="flex items-center gap-4">
+            <h2 className="text-[11px] font-black uppercase tracking-[0.5em] font-mono italic">{title.replace(' ', '_')}</h2>
+            {telemetryFn && <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-amber-500 animate-ping' : 'bg-emerald-500'}`}></div>}
+          </div>
+          <p className="text-3xl font-black text-white tracking-tighter max-w-2xl leading-tight">{description}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {insights.map((insight, idx) => (
+          <div key={idx} className="bg-[#0d0d0d] border border-white/5 p-8 rounded-[2.5rem] shadow-xl space-y-6">
+            <div className="flex justify-between items-start">
+              <div className="space-y-1">
+                <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{insight.label}</div>
+                <div className="text-3xl font-black text-white tracking-tighter">{insight.value}</div>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-gray-400">
+                <i className={`fa-solid ${insight.icon}`}></i>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                <div className={`h-full ${progressColors[color]} transition-all duration-1000`} style={{ width: `${insight.progress}%` }}></div>
+              </div>
+              <div className="text-[9px] font-mono text-gray-600 uppercase tracking-widest">{insight.subtext}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {extraContent && extraContent()}
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -48,9 +140,13 @@ const App: React.FC = () => {
   });
 
   const handleUpdateProvenanceGraph = useCallback(async () => {
-    const newData = await getGraphTelemetry('provenance');
-    if (newData && newData.nodes.length > 0) {
-      setProvenanceData(newData);
+    try {
+      const newData = await getGraphTelemetry('provenance');
+      if (newData && Array.isArray(newData.nodes) && newData.nodes.length > 0) {
+        setProvenanceData(newData);
+      }
+    } catch (err) {
+      console.error("Failed to update provenance graph", err);
     }
   }, []);
 
@@ -124,7 +220,7 @@ const App: React.FC = () => {
               { label: "Carbon Trace", value: "0.08g/hr", subtext: "Emission rate", icon: "fa-cloud-sun", progress: 88 }
             ]}
             telemetryFn={getGreenTelemetry}
-            extraContent={(insights) => <GreenParetoChart insights={insights} />}
+            extraContent={() => <GreenParetoChart agents={MOCK_AGENTS} selectedAgentId={MOCK_AGENTS[0].id} />}
           />
         );
       case 'quantum':
@@ -170,143 +266,49 @@ const App: React.FC = () => {
             extraContent={() => <ChaosSimulator />}
           />
         );
-      default: return <Dashboard hwProfile={hwProfile} />;
+      default: return null;
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-[#0a0a0a]">
-      <nav className="w-full md:w-64 bg-[#080808] border-r border-white/5 flex flex-col shrink-0">
-        <div className="p-6 border-b border-white/5">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-tr from-emerald-500 to-amber-600 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/10">
-              <i className="fa-solid fa-leaf text-xs text-white"></i>
+    <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-emerald-500/30">
+      <nav className="sticky top-0 z-[100] bg-[#050505]/80 backdrop-blur-3xl border-b border-white/5 px-8 py-6 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="flex items-center gap-6">
+          <div className="w-12 h-12 rounded-[1.2rem] bg-gradient-to-tr from-emerald-600 to-emerald-400 flex items-center justify-center text-2xl shadow-lg shadow-emerald-500/20">
+            <i className="fa-solid fa-bolt-lightning"></i>
+          </div>
+          <div>
+            <h1 className="text-xl font-black uppercase tracking-[0.3em] font-mono italic">AgentBeats<span className="text-emerald-500">.Green</span></h1>
+            <div className="flex items-center gap-3">
+              <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Sustainability Protocol v3.1</span>
+              <div className="w-1 h-1 rounded-full bg-emerald-500"></div>
+              <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Global Node: Active</span>
             </div>
-            <span className="font-black tracking-tighter text-lg uppercase italic">Green<span className="text-emerald-500">Agent</span></span>
           </div>
         </div>
-        <div className="flex-grow p-4 space-y-1 overflow-y-auto custom-scrollbar">
-          <NavItem icon="fa-chart-pie" label="Control Plane" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-          <NavItem icon="fa-network-wired" label="Carbon Supervisor" active={activeTab === 'orchestrator'} onClick={() => setActiveTab('orchestrator')} />
-          <NavItem icon="fa-diagram-project" label="Graph Provenance" active={activeTab === 'provenance'} onClick={() => setActiveTab('provenance')} />
-          <NavItem icon="fa-leaf" label="Strong Sustainability" active={activeTab === 'green'} onClick={() => setActiveTab('green')} />
-          <NavItem icon="fa-atom" label="Quantum QEC" active={activeTab === 'quantum'} onClick={() => setActiveTab('quantum')} />
-          <NavItem icon="fa-language" label="Global Mosaic" active={activeTab === 'mosaic'} onClick={() => setActiveTab('mosaic')} />
-          <NavItem icon="fa-file-shield" label="Policy Auditor" active={activeTab === 'policy'} onClick={() => setActiveTab('policy')} />
-          <NavItem icon="fa-fire-flame-curved" label="Chaos Workbench" active={activeTab === 'chaos'} onClick={() => setActiveTab('chaos')} />
-        </div>
-        <div className="p-4 border-t border-white/5 space-y-3">
-           <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-1">Edge_Benchmarking_Context</p>
-           <HardwareSelector selected={hwContext} onChange={setHwContext} />
-        </div>
-      </nav>
-      <main className="flex-grow overflow-y-auto bg-[#0a0a0a] relative">
-        {renderContent()}
-        <LiveAssistant />
-      </main>
-    </div>
-  );
-};
 
-const NavItem: React.FC<{ icon: string; label: string; active?: boolean; onClick: () => void }> = ({ icon, label, active, onClick }) => (
-  <button onClick={onClick} className={`w-full flex items-center space-x-4 px-4 py-4 rounded-2xl text-sm transition-all ${active ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/10 shadow-lg shadow-emerald-500/5' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
-    <i className={`fa-solid ${icon} w-6 text-center ${active ? 'text-emerald-500' : 'text-gray-500'}`}></i>
-    <span className="font-black uppercase tracking-tighter italic">{label}</span>
-  </button>
-);
-
-interface ModuleViewerProps {
-  title: string;
-  icon: string;
-  color: string;
-  description: string;
-  initialInsights: Insight[];
-  telemetryFn?: (insights: Insight[]) => Promise<any>;
-  extraContent?: (insights: Insight[]) => React.ReactNode;
-}
-
-const ModuleViewer: React.FC<ModuleViewerProps> = ({ title, icon, color, description, initialInsights, telemetryFn, extraContent }) => {
-  const [insights, setInsights] = useState<Insight[]>(initialInsights);
-  const [isUpdating, setIsUpdating] = useState(false);
-
-  const handleTelemetry = async () => {
-    if (!telemetryFn) return;
-    setIsUpdating(true);
-    try {
-      const updatedData = await telemetryFn(insights);
-      if (Array.isArray(updatedData)) {
-        setInsights(prev => prev.map(oldInsight => {
-          const match = updatedData.find(u => u.label === oldInsight.label);
-          return match ? { ...oldInsight, ...match } : oldInsight;
-        }));
-      }
-    } catch (error) {
-      console.error("Telemetry update failed", error);
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  const colorStyles: Record<string, string> = {
-    emerald: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/10',
-    violet: 'text-violet-400 border-violet-500/20 bg-violet-500/10',
-    amber: 'text-amber-400 border-amber-500/20 bg-amber-500/10',
-    red: 'text-red-400 border-red-500/20 bg-red-500/10',
-    blue: 'text-blue-400 border-blue-500/20 bg-blue-500/10'
-  };
-
-  return (
-    <div className="p-12 md:p-24 min-h-full space-y-16 animate-in fade-in">
-       <div className="flex flex-col md:flex-row items-center justify-between gap-12">
-          <div className="flex flex-col md:flex-row items-center gap-12">
-            <div className={`w-32 h-32 rounded-[2.5rem] border-[3px] flex items-center justify-center text-5xl shadow-2xl ${colorStyles[color] || 'text-emerald-400 border-emerald-500/20 bg-emerald-500/10'}`}>
-              <i className={`fa-solid ${icon}`}></i>
-            </div>
-            <div className="space-y-4 max-w-2xl text-center md:text-left">
-              <h1 className="text-6xl font-black text-white tracking-tighter leading-none italic uppercase">{title}</h1>
-              <p className="text-xl text-gray-400 font-light leading-relaxed border-l-4 border-emerald-500/30 pl-8">{description}</p>
-            </div>
-          </div>
-          
-          {telemetryFn && (
-            <button 
-              onClick={handleTelemetry} 
-              disabled={isUpdating}
-              className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 text-white font-black text-xs uppercase tracking-[0.2em] rounded-2xl shadow-xl shadow-emerald-500/10 transition-all flex items-center gap-3 active:scale-95"
+        <div className="flex items-center gap-8 bg-white/5 p-1.5 rounded-2xl border border-white/5 overflow-x-auto max-w-full custom-scrollbar">
+          {(['dashboard', 'orchestrator', 'mosaic', 'provenance', 'green', 'quantum', 'policy', 'chaos'] as TabType[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+                activeTab === tab ? 'bg-white/10 text-white shadow-lg' : 'text-gray-500 hover:text-white'
+              }`}
             >
-              <i className={`fa-solid ${isUpdating ? 'fa-spinner fa-spin' : 'fa-bolt-lightning'}`}></i>
-              {isUpdating ? 'Syncing...' : 'Update Telemetry'}
+              {tab}
             </button>
-          )}
-       </div>
-
-       {extraContent && (
-         <div className="animate-in slide-in-from-bottom-8 duration-700">
-           {extraContent(insights)}
-         </div>
-       )}
-       
-       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {insights.map((insight, idx) => (
-            <div key={idx} className="bg-white/5 border border-white/10 p-10 rounded-[2.5rem] space-y-6 group hover:border-emerald-500/20 transition-all shadow-xl">
-              <div className="flex justify-between items-center">
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-white/5 text-xl ${insight.progress > 70 ? 'text-emerald-500' : 'text-amber-500'}`}>
-                   <i className={`fa-solid ${insight.icon}`}></i>
-                </div>
-                <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest font-mono">{insight.label}</span>
-              </div>
-              <div>
-                <div className="text-5xl font-black text-white tracking-tighter mb-1">{insight.value}</div>
-                <div className="text-[11px] text-gray-500 font-bold uppercase tracking-widest">{insight.subtext}</div>
-              </div>
-              <div className="pt-4">
-                <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                  <div className={`h-full transition-all duration-1000 ${insight.progress > 70 ? 'bg-emerald-500' : insight.progress > 40 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${insight.progress}%` }}></div>
-                </div>
-              </div>
-            </div>
           ))}
-       </div>
+        </div>
+
+        <HardwareSelector selected={hwContext} onChange={setHwContext} />
+      </nav>
+
+      <main>
+        {renderContent()}
+      </main>
+
+      <LiveAssistant />
     </div>
   );
 };

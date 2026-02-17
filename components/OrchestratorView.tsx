@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
-import { getSupervisorPlan, refineGreenPrompt } from '../services/geminiService';
-import { AgentBenchmark, HardwareType, OrchestrationPlan, GreenRefinement } from '../types';
+import React, { useState, useEffect } from 'react';
+import { getSupervisorPlan, refineGreenPrompt, getRegionalCarbonIntensity } from '../services/geminiService';
+import { AgentBenchmark, HardwareType, OrchestrationPlan, GreenRefinement, GridContext } from '../types';
 import { MOCK_AGENTS } from '../constants';
 
 interface Props {
@@ -11,10 +11,27 @@ interface Props {
 const OrchestratorView: React.FC<Props> = ({ hwType }) => {
   const [task, setTask] = useState('Conduct a cross-script semantic audit and verify QEC stability across H100 clusters.');
   const [plan, setPlan] = useState<OrchestrationPlan | null>(null);
+  const [grid, setGrid] = useState<GridContext | null>(null);
   const [refinement, setRefinement] = useState<GreenRefinement | null>(null);
   const [loading, setLoading] = useState(false);
   const [isRefining, setIsRefining] = useState(false);
   const [budget, setBudget] = useState(5.0);
+
+  // Initialize Grid Data for Throttling
+  useEffect(() => {
+    const fetchGrid = async () => {
+      if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+          const data = await getRegionalCarbonIntensity(pos.coords.latitude, pos.coords.longitude);
+          setGrid(data);
+        }, async () => {
+          const data = await getRegionalCarbonIntensity();
+          setGrid(data);
+        });
+      }
+    };
+    fetchGrid();
+  }, []);
 
   const handleRefine = async () => {
     setIsRefining(true);
@@ -36,16 +53,36 @@ const OrchestratorView: React.FC<Props> = ({ hwType }) => {
   const handleGeneratePlan = async () => {
     setLoading(true);
     try {
-      const result = await getSupervisorPlan(task, MOCK_AGENTS, hwType, budget);
+      const result = await getSupervisorPlan(task, MOCK_AGENTS, hwType, budget, grid || undefined);
       setPlan(result);
     } finally {
       setLoading(false);
     }
   };
 
+  const isGridDirty = grid?.status === 'Dirty';
+
   return (
     <div className="space-y-12 mt-12 animate-in fade-in duration-700 max-w-[1400px] mx-auto pb-24">
       
+      {/* Grid Status Reactive Banner */}
+      {isGridDirty && (
+        <div className="bg-red-500/10 border border-red-500/30 p-6 rounded-[2rem] flex items-center justify-between animate-pulse">
+           <div className="flex items-center gap-6">
+              <div className="w-12 h-12 rounded-2xl bg-red-500 text-white flex items-center justify-center text-xl">
+                 <i className="fa-solid fa-triangle-exclamation"></i>
+              </div>
+              <div>
+                 <h4 className="text-xs font-black text-white uppercase tracking-widest">Dirty_Grid_Detected: {grid?.intensity} gCO2/kWh</h4>
+                 <p className="text-[10px] text-red-500 uppercase font-black italic">Eco-Mode Throttling Activated: Architectural Pruning Engaged.</p>
+              </div>
+           </div>
+           <div className="text-right">
+              <span className="text-[9px] font-mono text-red-500/60 uppercase">Source: Real-time Grid Data // Regional_Audit</span>
+           </div>
+        </div>
+      )}
+
       {/* Dynamic Sustainability Consultant Widget */}
       <div className={`bg-[#0d0d0d] border rounded-[3rem] p-12 shadow-2xl transition-all duration-700 relative overflow-hidden ${refinement ? 'border-emerald-500/40 ring-4 ring-emerald-500/5' : 'border-white/5'}`}>
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 via-transparent to-transparent opacity-20"></div>
@@ -89,7 +126,7 @@ const OrchestratorView: React.FC<Props> = ({ hwType }) => {
              <div className="space-y-10 flex flex-col justify-between py-2">
                 <div className="space-y-8">
                    <div className="flex items-center gap-8">
-                      <div className="w-20 h-20 rounded-[2rem] bg-emerald-500 text-white flex flex-col items-center justify-center shadow-2xl shadow-emerald-500/20">
+                      <div className="w-20 h-20 rounded-[2rem] bg-emerald-500 text-white flex items-center justify-center shadow-2xl shadow-emerald-500/20">
                          <span className="text-2xl font-black">{refinement.estimatedSavings.replace('%', '')}</span>
                          <span className="text-[9px] font-black uppercase tracking-widest">% SAVED</span>
                       </div>
@@ -165,17 +202,6 @@ const OrchestratorView: React.FC<Props> = ({ hwType }) => {
                          {plan.marginalSavings?.percentage}% Relative Efficiency Gain
                       </div>
                    </div>
-
-                   <div className="grid grid-cols-2 gap-6 px-2">
-                      <div className="p-6 bg-white/5 rounded-3xl text-center space-y-1">
-                         <div className="text-[9px] font-black text-gray-600 uppercase tracking-widest italic">Trees_Eq</div>
-                         <div className="text-lg font-black text-white">0.05/Hr</div>
-                      </div>
-                      <div className="p-6 bg-white/5 rounded-3xl text-center space-y-1">
-                         <div className="text-[9px] font-black text-gray-600 uppercase tracking-widest italic">Grid_Relief</div>
-                         <div className="text-lg font-black text-white">OPTIMAL</div>
-                      </div>
-                   </div>
                 </div>
              </div>
 
@@ -187,6 +213,11 @@ const OrchestratorView: React.FC<Props> = ({ hwType }) => {
                 <p className="text-[14px] text-gray-400 font-serif italic leading-relaxed border-l-2 border-emerald-500/20 pl-8">
                   "{plan.reasoning}"
                 </p>
+                {plan.adaptationStrategy && (
+                  <div className="pt-4 border-t border-white/5">
+                     <span className="text-[10px] font-black text-white uppercase bg-blue-500/20 px-4 py-1.5 rounded-xl">Strategy: {plan.adaptationStrategy}</span>
+                  </div>
+                )}
              </div>
           </div>
 
