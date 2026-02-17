@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import Dashboard from './components/Dashboard';
 import GreenParetoChart from './components/GreenParetoChart';
@@ -28,9 +27,6 @@ interface Insight {
   progress: number;
 }
 
-/**
- * ModuleViewer component to wrap each dashboard section with common UI elements and telemetry.
- */
 const ModuleViewer: React.FC<{
   title: string;
   icon: string;

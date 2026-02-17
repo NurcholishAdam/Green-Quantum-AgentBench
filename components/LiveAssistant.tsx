@@ -31,7 +31,8 @@ const LiveAssistant: React.FC = () => {
 
   const startSession = async () => {
     setIsConnecting(true);
-    const ai = new GoogleGenAI({ apiKey: (process as any).env.API_KEY });
+    // Use process.env.API_KEY directly as required by guidelines
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     try {
       if (!audioContextRef.current) {

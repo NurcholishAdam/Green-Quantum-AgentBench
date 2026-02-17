@@ -37,7 +37,7 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
     return calculateUGScore(selectedAgent.greenScore, selectedAgent.energyPerToken, selectedAgent.latency);
   }, [selectedAgent]);
 
-  const eEff = useMemo(() => {
+  const quantumEffMetric = useMemo(() => {
     return calculateEEff(selectedAgent.greenScore, selectedAgent.energyPerToken);
   }, [selectedAgent]);
 
@@ -81,9 +81,8 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
     { subject: 'Carbon', A: (1 - selectedAgent.carbonIntensity) * 100 },
     { subject: 'Memory', A: selectedAgent.memoryEfficiency },
     { subject: 'Ug Utility', A: uG },
-    // Fix: replaced 'eff' with 'eEff'
-    { subject: 'E-Eff', A: eEff * 10 }, // Scalling for radar
-  ], [selectedAgent, uG, eEff]);
+    { subject: 'E-Eff', A: quantumEffMetric * 10 }, 
+  ], [selectedAgent, uG, quantumEffMetric]);
 
   return (
     <div className="p-4 md:p-8 space-y-12 animate-in fade-in duration-1000 max-w-[1600px] mx-auto pb-24">
@@ -125,12 +124,11 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
          </div>
          
          <div className="lg:col-span-4 bg-[#0d0d0d] border border-white/5 p-10 rounded-[3rem] flex flex-col justify-center items-center text-center shadow-xl group hover:border-emerald-500/20 transition-all">
-            {/* Fix: ensure eEff is used for the gauge score */}
-            <div className="text-6xl font-black text-white mb-2 tracking-tighter group-hover:text-emerald-500 transition-colors">{eEff.toFixed(2)}</div>
-            <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-6 italic">Quantum_E_Eff Metric ($E_{eff}$)</div>
+            <div className="text-6xl font-black text-white mb-2 tracking-tighter group-hover:text-emerald-500 transition-colors">{quantumEffMetric.toFixed(2)}</div>
+            {/* Fixed JSX error: Wrapped LaTeX-style text in braces to avoid parsing {eff} as a variable */}
+            <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-6 italic">{"Quantum_E_Eff Metric ($E_{eff}$)"}</div>
             <div className="w-full h-2.5 bg-white/5 rounded-full overflow-hidden mb-2 shadow-inner">
-               {/* Fix: line 128 (approx) changed 'eff' to 'eEff' */}
-               <div className="h-full bg-blue-500 shadow-[0_0_15px_#3b82f6]" style={{ width: `${eEff * 8}%` }}></div>
+               <div className="h-full bg-blue-500 shadow-[0_0_15px_#3b82f6]" style={{ width: `${Math.min(100, quantumEffMetric * 8)}%` }}></div>
             </div>
             <p className="text-[9px] text-gray-600 font-mono uppercase tracking-widest">Task Ratio / Energy Per Bit</p>
          </div>
@@ -226,12 +224,12 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
         </div>
       </div>
 
-      {/* Agent Selection Matrix - Sorted by Eeff */}
       <div className="bg-[#0d0d0d] border border-white/5 p-12 rounded-[3.5rem] shadow-2xl overflow-hidden">
         <div className="flex flex-col md:flex-row items-center justify-between mb-12 border-b border-white/10 pb-8 gap-6">
            <div className="space-y-2 text-center md:text-left">
              <h3 className="text-lg font-black text-white uppercase tracking-[0.4em] font-mono italic">Agent_Efficiency_Matrix</h3>
-             <p className="text-[11px] text-gray-500 font-bold uppercase tracking-widest italic">Sorted by Quantum Energy-per-Bit ($E_{eff}$)</p>
+             {/* Fixed JSX error: Wrapped LaTeX-style text in braces to avoid parsing {eff} as a variable */}
+             <p className="text-[11px] text-gray-500 font-bold uppercase tracking-widest italic">{"Sorted by Quantum Energy-per-Bit ($E_{eff}$)"}</p>
            </div>
         </div>
         
@@ -249,8 +247,7 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
             <tbody>
               {MOCK_AGENTS.map((agent) => {
                 const currentUg = calculateUGScore(agent.greenScore, agent.energyPerToken, agent.latency);
-                // Fix: ensure currentEeff is calculated correctly for each row
-                const currentEeff = calculateEEff(agent.greenScore, agent.energyPerToken);
+                const agentEffMetric = calculateEEff(agent.greenScore, agent.energyPerToken);
                 const isSelected = agent.id === selectedAgentId;
                 const mSavings = (agent.carbonIntensity * 2.85) - agent.carbonIntensity;
                 
@@ -272,8 +269,7 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
                       </div>
                     </td>
                     <td className="py-8 px-8 text-center">
-                       {/* Fix: replaced 'eff' with 'currentEeff' in row rendering */}
-                       <span className="text-xl font-black text-blue-400 font-mono tracking-tighter">{currentEeff.toFixed(2)}</span>
+                       <span className="text-xl font-black text-blue-400 font-mono tracking-tighter">{agentEffMetric.toFixed(2)}</span>
                     </td>
                     <td className="py-8 px-8 text-center">
                       <div className="flex flex-col items-center gap-2">
