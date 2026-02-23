@@ -13,16 +13,49 @@ interface Props {
 
 const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance', autoRefresh = true }) => {
   const svgRef = useRef<SVGSVGElement>(null);
-  const tooltipRef = useRef<HTMLDivElement>(null);
   const [graphData, setGraphData] = useState<QuantumGraphData>(initialData);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [viewMode, setViewMode] = useState<'graph' | 'pareto' | 'resources'>('graph');
+  const [viewMode, setViewMode] = useState<'graph' | 'pareto' | 'resources'>(() => {
+    const saved = localStorage.getItem('quantum_graph_view_mode');
+    if (saved === 'graph' || saved === 'pareto' || saved === 'resources') return saved;
+    return 'graph';
+  });
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(MOCK_AGENTS[0].id);
   const [detailAgent, setDetailAgent] = useState<AgentBenchmark | null>(null);
   const [agentBenchmarks, setAgentBenchmarks] = useState<any>(null);
   const [isLoadingBenchmarks, setIsLoadingBenchmarks] = useState(false);
   const [visibleTypes, setVisibleTypes] = useState<Set<string>>(new Set(['quantum', 'agent', 'error', 'provenance', 'policy', 'hardware']));
+  const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
+  const [tooltip, setTooltip] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    data: any;
+    type: 'node' | 'link' | 'pareto' | 'resource';
+  } | null>(null);
+  const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
+
+  const hideTooltip = useCallback(() => {
+    tooltipTimeoutRef.current = setTimeout(() => {
+      setTooltip(null);
+    }, 500);
+  }, []);
+
+  const showTooltip = useCallback((event: any, data: any, type: 'node' | 'link' | 'pareto' | 'resource') => {
+    if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
+    setTooltip({
+      visible: true,
+      x: event.clientX,
+      y: event.clientY,
+      data,
+      type
+    });
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('quantum_graph_view_mode', viewMode);
+  }, [viewMode]);
 
   const toggleType = (type: string) => {
     setVisibleTypes(prev => {
@@ -36,21 +69,47 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
     });
   };
 
-  const handleAgentClick = useCallback(async (agentId: string) => {
+  const getConnectedElements = useCallback((nodeId: string) => {
+    const connectedLinks = (graphData.links || []).filter(l => {
+      const s = typeof l.source === 'string' ? l.source : (l.source as any).id;
+      const t = typeof l.target === 'string' ? l.target : (l.target as any).id;
+      return s === nodeId || t === nodeId;
+    });
+    const connectedNodeIds = new Set(connectedLinks.flatMap(l => {
+      const s = typeof l.source === 'string' ? l.source : (l.source as any).id;
+      const t = typeof l.target === 'string' ? l.target : (l.target as any).id;
+      return [s, t];
+    }));
+    return { connectedLinks, connectedNodeIds };
+  }, [graphData.links]);
+
+  const handleAgentClick = useCallback((agentId: string) => {
     const agent = MOCK_AGENTS.find(a => a.id === agentId);
     if (agent) {
       setDetailAgent(agent);
-      setIsLoadingBenchmarks(true);
-      try {
-        const benchmarks = await getAgentBenchmarks(agent);
-        setAgentBenchmarks(benchmarks);
-      } catch (err) {
-        console.error("Failed to fetch benchmarks", err);
-      } finally {
-        setIsLoadingBenchmarks(false);
-      }
+      setSelectedAgentId(agentId);
     }
   }, []);
+
+  useEffect(() => {
+    const fetchBenchmarks = async () => {
+      if (selectedAgentId) {
+        const agent = MOCK_AGENTS.find(a => a.id === selectedAgentId);
+        if (agent) {
+          setIsLoadingBenchmarks(true);
+          try {
+            const benchmarks = await getAgentBenchmarks(agent);
+            setAgentBenchmarks(benchmarks);
+          } catch (err) {
+            console.error("Failed to fetch benchmarks", err);
+          } finally {
+            setIsLoadingBenchmarks(false);
+          }
+        }
+      }
+    };
+    fetchBenchmarks();
+  }, [selectedAgentId]);
 
   const fetchUpdate = useCallback(async () => {
     setIsSyncing(true);
@@ -93,12 +152,11 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
   }, []);
 
   useEffect(() => {
-    if (!svgRef.current || !tooltipRef.current) return;
+    if (!svgRef.current) return;
 
     const width = svgRef.current.clientWidth;
     const height = svgRef.current.clientHeight || 450;
     const svg = d3.select(svgRef.current);
-    const tooltip = d3.select(tooltipRef.current);
 
     if (viewMode === 'pareto') {
       svg.selectAll("*").remove();
@@ -211,42 +269,15 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
         .attr("stroke-width", 2)
         .attr("cursor", "pointer")
         .on("mouseover", (event, d) => {
-          tooltip.transition().duration(200).style("opacity", 1);
-          tooltip.html(`
-            <div class="space-y-3 min-w-[220px]">
-              <div class="flex items-center justify-between border-b border-white/10 pb-2">
-                <span class="text-[9px] uppercase font-black tracking-widest ${frontierSet.has(d.id) ? 'text-emerald-500' : 'text-blue-500'} font-mono">
-                  ${frontierSet.has(d.id) ? 'Frontier_Optimal' : 'Sub_Optimal'}
-                </span>
-                <span class="text-[8px] font-mono text-white/30 italic">v${d.version}</span>
-              </div>
-              <div class="text-lg font-black text-white tracking-tight">${d.name}</div>
-              <div class="grid grid-cols-2 gap-4 pt-1">
-                <div class="space-y-1">
-                  <div class="text-[8px] text-gray-500 uppercase font-black">Energy</div>
-                  <div class="text-sm font-mono font-bold text-white">${d.energyPerToken} <span class="text-[9px] text-gray-600">J/t</span></div>
-                </div>
-                <div class="space-y-1">
-                  <div class="text-[8px] text-gray-500 uppercase font-black">Accuracy</div>
-                  <div class="text-sm font-mono font-bold text-white">${d.sScore}%</div>
-                </div>
-              </div>
-              <div class="pt-2">
-                <div class="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                  <div class="h-full ${frontierSet.has(d.id) ? 'bg-emerald-500' : 'bg-blue-500'}" style="width: ${d.sScore}%"></div>
-                </div>
-              </div>
-            </div>
-          `);
+          showTooltip(event, d, 'pareto');
         })
         .on("mousemove", (event) => {
-          tooltip.style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 28) + "px");
+          setTooltip(prev => prev ? { ...prev, x: event.clientX, y: event.clientY } : null);
         })
         .on("mouseout", () => {
-          tooltip.transition().duration(500).style("opacity", 0);
+          hideTooltip();
         })
         .on("click", (event, d) => {
-          setSelectedAgentId(d.id);
           handleAgentClick(d.id);
         });
 
@@ -347,29 +378,15 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
         .attr("rx", 4)
         .attr("cursor", "pointer")
         .on("mouseover", (event, d) => {
-          tooltip.transition().duration(200).style("opacity", 1);
-          tooltip.html(`
-            <div class="space-y-2 min-w-[180px]">
-              <div class="text-[9px] uppercase font-black tracking-widest text-gray-500 font-mono">${d.key}_Load_Audit</div>
-              <div class="text-sm font-black text-white">${d.raw.name}</div>
-              <div class="flex items-center justify-between pt-1">
-                <span class="text-[10px] text-gray-400 uppercase font-bold">Intensity</span>
-                <span class="text-sm font-mono font-bold" style="color: ${color(d.key)}">${d.value.toFixed(1)}%</span>
-              </div>
-              <div class="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-2">
-                <div class="h-full" style="width: ${d.value}%; background-color: ${color(d.key)}"></div>
-              </div>
-            </div>
-          `);
+          showTooltip(event, d, 'resource');
         })
         .on("mousemove", (event) => {
-          tooltip.style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 28) + "px");
+          setTooltip(prev => prev ? { ...prev, x: event.clientX, y: event.clientY } : null);
         })
         .on("mouseout", () => {
-          tooltip.transition().duration(500).style("opacity", 0);
+          hideTooltip();
         })
         .on("click", (event, d) => {
-          setSelectedAgentId(d.raw.id);
           handleAgentClick(d.raw.id);
         })
         .transition().duration(1000).delay((d, i) => i * 50)
@@ -440,6 +457,8 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
     sim.nodes(nodes);
     (sim.force("link") as d3.ForceLink<any, any>).links(links);
 
+    const connectedElements = highlightedNodeId ? getConnectedElements(highlightedNodeId) : null;
+
     const linkElements = svg.select(".links")
       .selectAll("line")
       .data(links, (d: any) => `${typeof d.source === 'string' ? d.source : d.source.id}-${typeof d.target === 'string' ? d.target : d.target.id}`)
@@ -448,42 +467,38 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
           .attr("stroke-width", 0)
           .attr("stroke-opacity", 0)
           .transition().duration(800)
-          .attr("stroke-opacity", (d: any) => Math.min(0.7, 0.15 + (d.weight / 40)))
+          .attr("stroke-opacity", (d: any) => {
+            if (highlightedNodeId) {
+              const s = typeof d.source === 'string' ? d.source : d.source.id;
+              const t = typeof d.target === 'string' ? d.target : d.target.id;
+              return (s === highlightedNodeId || t === highlightedNodeId) ? 0.8 : 0.05;
+            }
+            return Math.min(0.7, 0.15 + (d.weight / 40));
+          })
           .attr("stroke-width", (d: any) => 1.5 + (d.weight / 8))
           .selection(),
         update => update
           .transition().duration(800)
           .attr("stroke-width", (d: any) => 1.5 + (d.weight / 8))
-          .attr("stroke-opacity", (d: any) => Math.min(0.7, 0.15 + (d.weight / 40)))
+          .attr("stroke-opacity", (d: any) => {
+            if (highlightedNodeId) {
+              const s = typeof d.source === 'string' ? d.source : d.source.id;
+              const targetId = typeof d.target === 'string' ? d.target : d.target.id;
+              return (s === highlightedNodeId || targetId === highlightedNodeId) ? 0.8 : 0.05;
+            }
+            return Math.min(0.7, 0.15 + (d.weight / 40));
+          })
           .selection(),
         exit => exit.transition().duration(500).attr("stroke-width", 0).remove()
       )
       .on("mouseover", (event, d: any) => {
-        tooltip.transition().duration(200).style("opacity", 1);
-        tooltip.html(`
-          <div class="space-y-2 min-w-[200px]">
-            <div class="flex items-center justify-between border-b border-white/10 pb-2 mb-1">
-              <span class="text-[9px] uppercase font-black tracking-[0.2em] text-gray-500 font-mono">edge_link</span>
-              <span class="text-[8px] font-mono text-white/30 italic">WEIGHT: ${d.weight.toFixed(1)}</span>
-            </div>
-            <div class="flex items-center gap-3 py-1">
-              <span class="text-[11px] font-bold text-white">${d.source.label}</span>
-              <i class="fa-solid fa-arrow-right-long text-[9px] text-emerald-500"></i>
-              <span class="text-[11px] font-bold text-white">${d.target.label}</span>
-            </div>
-            <div class="pt-2">
-               <div class="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                 <div class="h-full bg-emerald-500" style="width: ${Math.min(100, d.weight * 2)}%"></div>
-               </div>
-            </div>
-          </div>
-        `);
+        showTooltip(event, d, 'link');
       })
       .on("mousemove", (event) => {
-        tooltip.style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 28) + "px");
+        setTooltip(prev => prev ? { ...prev, x: event.clientX, y: event.clientY } : null);
       })
       .on("mouseout", () => {
-        tooltip.transition().duration(500).style("opacity", 0);
+        hideTooltip();
       })
       .attr("stroke", (d: any) => d.weight > 20 ? "#10b981" : d.weight > 10 ? "#3b82f6" : "#444")
       .attr("stroke-dasharray", (d: any) => d.weight < 8 ? "6,4" : "none")
@@ -513,40 +528,33 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
           )
           .transition().duration(1000)
           .attr("r", (d: any) => 14 + (d.val / 7))
-          .attr("opacity", 1)
+          .attr("opacity", (d: any) => {
+            if (highlightedNodeId) {
+              return (d.id === highlightedNodeId || connectedElements?.connectedNodeIds.has(d.id)) ? 1 : 0.1;
+            }
+            return 1;
+          })
           .selection(),
         update => update
           .transition().duration(1000)
           .attr("r", (d: any) => 14 + (d.val / 7))
+          .attr("opacity", (d: any) => {
+            if (highlightedNodeId) {
+              return (d.id === highlightedNodeId || connectedElements?.connectedNodeIds.has(d.id)) ? 1 : 0.1;
+            }
+            return 1;
+          })
           .selection(),
         exit => exit.transition().duration(500).attr("r", 0).remove()
       )
       .on("mouseover", (event, d: any) => {
-        tooltip.transition().duration(200).style("opacity", 1);
-        tooltip.html(`
-          <div class="space-y-2 min-w-[240px]">
-            <div class="flex items-center justify-between border-b border-white/10 pb-2 mb-1">
-              <span class="text-[9px] uppercase font-black tracking-[0.2em] text-gray-500 font-mono">${d.type}_node</span>
-              <span class="text-[8px] font-mono text-white/30 italic">ID:${d.id}</span>
-            </div>
-            <div class="text-[16px] font-black text-white tracking-tight leading-tight">${d.label}</div>
-            <div class="pt-2 space-y-3">
-              <div class="flex items-center justify-between">
-                <span class="text-[9px] text-gray-600 uppercase font-black">Node_Fidelity</span>
-                <span class="text-[13px] font-mono font-bold" style="color: ${QUANTUM_COLORS[d.type as keyof typeof QUANTUM_COLORS]}">${d.val.toFixed(2)}%</span>
-              </div>
-              <div class="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                 <div class="h-full transition-all duration-1000" style="width: ${d.val}%; background-color: ${QUANTUM_COLORS[d.type as keyof typeof QUANTUM_COLORS]}"></div>
-              </div>
-            </div>
-          </div>
-        `);
+        showTooltip(event, d, 'node');
       })
       .on("mousemove", (event) => {
-        tooltip.style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 28) + "px");
+        setTooltip(prev => prev ? { ...prev, x: event.clientX, y: event.clientY } : null);
       })
       .on("mouseout", () => {
-        tooltip.transition().duration(500).style("opacity", 0);
+        hideTooltip();
       })
       .on("click", (event, d: any) => {
         if (d.type === 'agent') {
@@ -570,7 +578,7 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
     });
 
     sim.alpha(0.15).restart();
-  }, [graphData, visibleTypes, viewMode, selectedAgentId]);
+  }, [graphData, visibleTypes, viewMode, selectedAgentId, highlightedNodeId, getConnectedElements, handleAgentClick, showTooltip, hideTooltip]);
 
   const fullNodes = graphData?.nodes || [];
   const activeNodes = fullNodes.filter(n => visibleTypes.has(n.type));
@@ -582,15 +590,148 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
 
   return (
     <div className="relative w-full bg-[#0d0d0d] border border-white/5 rounded-[3rem] overflow-hidden h-[550px] shadow-[0_40px_100px_rgba(0,0,0,0.6)] flex flex-col group">
-      <div ref={tooltipRef} className="pointer-events-none fixed z-[9999] opacity-0 bg-black/95 backdrop-blur-3xl border border-white/10 p-6 rounded-[2rem] shadow-2xl transition-opacity duration-300" />
+      <AnimatePresence>
+        {tooltip && tooltip.visible && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9, filter: 'blur(10px)' }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            onMouseEnter={() => { if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current); }}
+            onMouseLeave={hideTooltip}
+            className="fixed z-[9999] bg-black/95 backdrop-blur-3xl border border-white/10 p-6 rounded-[2rem] shadow-2xl pointer-events-auto"
+            style={{ left: tooltip.x + 15, top: tooltip.y - 28 }}
+          >
+            {tooltip.type === 'node' && (
+              <div className="space-y-4 min-w-[240px]">
+                <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                  <span className="text-[9px] uppercase font-black tracking-[0.2em] text-gray-500 font-mono">{tooltip.data.type}_node</span>
+                  <span className="text-[8px] font-mono text-white/30 italic">ID:{tooltip.data.id}</span>
+                </div>
+                <div className="text-[16px] font-black text-white tracking-tight leading-tight">{tooltip.data.label}</div>
+                
+                {tooltip.data.type === 'agent' && (() => {
+                  const agent = MOCK_AGENTS.find(a => a.id === tooltip.data.id);
+                  if (!agent) return null;
+                  return (
+                    <div className="grid grid-cols-2 gap-4 border-y border-white/5 py-3 my-1">
+                       <div className="space-y-1">
+                          <div className="text-[8px] text-gray-500 uppercase font-black tracking-widest">Green_Score</div>
+                          <div className="text-sm font-mono font-bold text-emerald-500">{agent.greenScore}</div>
+                       </div>
+                       <div className="space-y-1">
+                          <div className="text-[8px] text-gray-500 uppercase font-black tracking-widest">HW_Profile</div>
+                          <div className="text-[10px] font-mono font-bold text-blue-400 truncate">{agent.hwProfile || 'Generic_NPU'}</div>
+                       </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="pt-2 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] text-gray-600 uppercase font-black">Node_Fidelity</span>
+                    <span className="text-[13px] font-mono font-bold" style={{ color: QUANTUM_COLORS[tooltip.data.type as keyof typeof QUANTUM_COLORS] }}>{tooltip.data.val.toFixed(2)}%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                     <div className="h-full transition-all duration-1000" style={{ width: `${tooltip.data.val}%`, backgroundColor: QUANTUM_COLORS[tooltip.data.type as keyof typeof QUANTUM_COLORS] }}></div>
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  {tooltip.data.type === 'agent' && (
+                    <button 
+                      onClick={() => { handleAgentClick(tooltip.data.id); setTooltip(null); }}
+                      className="flex-grow py-2 bg-emerald-500 hover:bg-emerald-400 text-black text-[9px] font-black uppercase rounded-xl transition-all"
+                    >
+                      View_Details
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => { setHighlightedNodeId(prev => prev === tooltip.data.id ? null : tooltip.data.id); setTooltip(null); }}
+                    className={`flex-grow py-2 border border-white/10 text-[9px] font-black uppercase rounded-xl transition-all ${highlightedNodeId === tooltip.data.id ? 'bg-blue-500 text-white' : 'hover:bg-white/5 text-gray-400'}`}
+                  >
+                    {highlightedNodeId === tooltip.data.id ? 'Clear_Highlight' : 'Highlight_Links'}
+                  </button>
+                </div>
+              </div>
+            )}
+            {tooltip.type === 'link' && (
+              <div className="space-y-3 min-w-[200px]">
+                <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-1">
+                  <span className="text-[9px] uppercase font-black tracking-[0.2em] text-gray-500 font-mono">edge_link</span>
+                  <span className="text-[8px] font-mono text-white/30 italic">WEIGHT: {tooltip.data.weight.toFixed(1)}</span>
+                </div>
+                <div className="flex items-center gap-3 py-1">
+                  <span className="text-[11px] font-bold text-white">{tooltip.data.source.label}</span>
+                  <i className="fa-solid fa-arrow-right-long text-[9px] text-emerald-500"></i>
+                  <span className="text-[11px] font-bold text-white">{tooltip.data.target.label}</span>
+                </div>
+                <div className="pt-2">
+                   <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                     <div className="h-full bg-emerald-500" style={{ width: `${Math.min(100, tooltip.data.weight * 2)}%` }}></div>
+                   </div>
+                </div>
+              </div>
+            )}
+            {tooltip.type === 'pareto' && (
+              <div className="space-y-3 min-w-[220px]">
+                <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                  <span className="text-[9px] uppercase font-black tracking-widest font-mono text-emerald-500">
+                    Agent_Bench_Audit
+                  </span>
+                  <span className="text-[8px] font-mono text-white/30 italic">v{tooltip.data.version}</span>
+                </div>
+                <div className="text-lg font-black text-white tracking-tight">{tooltip.data.name}</div>
+                <div className="grid grid-cols-2 gap-4 pt-1">
+                  <div className="space-y-1">
+                    <div className="text-[8px] text-gray-500 uppercase font-black">Energy</div>
+                    <div className="text-sm font-mono font-bold text-white">{tooltip.data.energyPerToken} <span className="text-[9px] text-gray-600">J/t</span></div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-[8px] text-gray-500 uppercase font-black">Accuracy</div>
+                    <div className="text-sm font-mono font-bold text-white">{tooltip.data.sScore}%</div>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => { handleAgentClick(tooltip.data.id); setTooltip(null); }}
+                  className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 text-black text-[9px] font-black uppercase rounded-xl transition-all mt-2"
+                >
+                  Inspect_Agent_Nexus
+                </button>
+              </div>
+            )}
+            {tooltip.type === 'resource' && (
+              <div className="space-y-2 min-w-[180px]">
+                <div className="text-[9px] uppercase font-black tracking-widest text-gray-500 font-mono">{tooltip.data.key}_Load_Audit</div>
+                <div className="text-sm font-black text-white">{tooltip.data.raw.name}</div>
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[10px] text-gray-400 uppercase font-bold">Intensity</span>
+                  <span className="text-sm font-mono font-bold text-white">{tooltip.data.value.toFixed(1)}%</span>
+                </div>
+                <button 
+                  onClick={() => { handleAgentClick(tooltip.data.raw.id); setTooltip(null); }}
+                  className="w-full py-2 bg-white/5 hover:bg-white/10 text-white text-[9px] font-black uppercase rounded-xl transition-all mt-2 border border-white/10"
+                >
+                  View_Agent_Profile
+                </button>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       <div className="absolute top-10 left-12 z-10 space-y-2">
         <div className="flex items-center gap-4">
            <div className={`w-3 h-3 rounded-full ${isSyncing ? 'bg-amber-500 animate-ping' : 'bg-emerald-500'} shadow-lg shadow-emerald-500/20`}></div>
-           <h3 className="text-[11px] font-black text-white uppercase tracking-[0.5em] font-mono">Dynamic_Lineage_Orchestrator</h3>
+           <h3 className="text-[11px] font-black text-white uppercase tracking-[0.5em] font-mono">
+             {viewMode === 'graph' ? 'Dynamic_Lineage_Orchestrator' : 
+              viewMode === 'pareto' ? 'Sustainability_Pareto_Frontier' : 
+              'Agent_Resource_Intensity_Matrix'}
+           </h3>
         </div>
         <p className="text-[9px] font-mono text-gray-600 uppercase tracking-widest pl-7">
-          {isSyncing ? 'Recalculating Decision Lineage...' : 'Tracking Real-time Path Stability Flux'}
+          {viewMode === 'graph' ? (isSyncing ? 'Recalculating Decision Lineage...' : 'Tracking Real-time Path Stability Flux') :
+           viewMode === 'pareto' ? 'Visualizing Efficiency vs Accuracy Trade-offs' :
+           'Auditing CPU, Memory, and Energy Load Profiles'}
         </p>
       </div>
 

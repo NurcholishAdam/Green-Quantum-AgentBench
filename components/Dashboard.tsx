@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer 
 } from 'recharts';
+import { motion } from 'motion/react';
 import { MOCK_AGENTS } from '../constants';
 import { AgentBenchmark, HardwareProfile, GridContext } from '../types';
 import QuantumGraph from './QuantumGraph';
@@ -96,14 +97,40 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
                <i className="fa-solid fa-bolt text-[12rem] text-emerald-500"></i>
             </div>
             <div className="flex items-center gap-10 relative z-10">
-               <div className="w-24 h-24 rounded-[2.2rem] bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-5xl text-emerald-500 shadow-xl shadow-emerald-500/5">
-                  <i className="fa-solid fa-leaf-heart"></i>
+               <div className="relative w-24 h-24">
+                  <svg className="w-full h-full transform -rotate-90">
+                    <circle
+                      cx="48"
+                      cy="48"
+                      r="40"
+                      stroke="currentColor"
+                      strokeWidth="8"
+                      fill="transparent"
+                      className="text-white/5"
+                    />
+                    <motion.circle
+                      cx="48"
+                      cy="48"
+                      r="40"
+                      stroke="currentColor"
+                      strokeWidth="8"
+                      fill="transparent"
+                      strokeDasharray={251.2}
+                      initial={{ strokeDashoffset: 251.2 }}
+                      animate={{ strokeDashoffset: 251.2 - (Math.min(100, (cumulativeSavings / 100) * 100) / 100) * 251.2 }}
+                      className="text-emerald-500 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <i className="fa-solid fa-leaf-heart text-2xl text-emerald-500"></i>
+                  </div>
                </div>
                <div className="space-y-2">
                   <h2 className="text-[11px] font-black text-emerald-400 uppercase tracking-[0.5em] font-mono italic">Regional_Grid_Reactive_Audit</h2>
                   <p className="text-4xl font-black text-white tracking-tighter max-w-lg leading-tight">
                     Net Carbon Saved: <span className="text-emerald-500">{cumulativeSavings.toFixed(2)}g</span>
                   </p>
+                  <div className="text-[9px] font-mono text-gray-500 uppercase tracking-widest">Session_Goal: 100g Mitigation</div>
                   <div className="flex items-center gap-8 pt-3">
                      <div className="flex items-center gap-3 text-[10px] font-black text-emerald-500/60 uppercase font-mono">
                         <i className="fa-solid fa-shield-check"></i> {avoidanceRate.toFixed(1)}% Gain vs. Legacy

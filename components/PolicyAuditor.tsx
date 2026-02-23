@@ -59,7 +59,12 @@ const PolicyAuditor: React.FC = () => {
           Audit_Output_Node
         </h3>
 
-        {report ? (
+        {isAuditing ? (
+          <div className="flex-grow flex flex-col items-center justify-center space-y-6 animate-in fade-in duration-500">
+             <div className="w-20 h-20 rounded-full border-2 border-amber-500/10 border-t-amber-500 animate-spin"></div>
+             <p className="text-[9px] font-black uppercase tracking-[0.5em] text-amber-500 animate-pulse">Auditing_Policy_Flux...</p>
+          </div>
+        ) : report ? (
           <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar space-y-4 animate-in fade-in">
              <div className="p-6 bg-white/5 border border-white/10 rounded-2xl">
                 <div className="flex items-center gap-3 mb-4">
