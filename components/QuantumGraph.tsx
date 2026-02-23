@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
 import { QuantumGraphData, GraphNode, GraphLink, AgentBenchmark } from '../types';
 import { QUANTUM_COLORS, MOCK_AGENTS } from '../constants';
-import { getGraphTelemetry } from '../services/geminiService';
+import { getGraphTelemetry, getAgentBenchmarks } from '../services/geminiService';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface Props {
   data: QuantumGraphData;
@@ -17,6 +18,9 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
   const [isSyncing, setIsSyncing] = useState(false);
   const [viewMode, setViewMode] = useState<'graph' | 'pareto'>('graph');
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(MOCK_AGENTS[0].id);
+  const [detailAgent, setDetailAgent] = useState<AgentBenchmark | null>(null);
+  const [agentBenchmarks, setAgentBenchmarks] = useState<any>(null);
+  const [isLoadingBenchmarks, setIsLoadingBenchmarks] = useState(false);
   const [visibleTypes, setVisibleTypes] = useState<Set<string>>(new Set(['quantum', 'agent', 'error', 'provenance', 'policy', 'hardware']));
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
 
@@ -31,6 +35,22 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
       return next;
     });
   };
+
+  const handleAgentClick = useCallback(async (agentId: string) => {
+    const agent = MOCK_AGENTS.find(a => a.id === agentId);
+    if (agent) {
+      setDetailAgent(agent);
+      setIsLoadingBenchmarks(true);
+      try {
+        const benchmarks = await getAgentBenchmarks(agent);
+        setAgentBenchmarks(benchmarks);
+      } catch (err) {
+        console.error("Failed to fetch benchmarks", err);
+      } finally {
+        setIsLoadingBenchmarks(false);
+      }
+    }
+  }, []);
 
   const fetchUpdate = useCallback(async () => {
     setIsSyncing(true);
@@ -227,6 +247,7 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
         })
         .on("click", (event, d) => {
           setSelectedAgentId(d.id);
+          handleAgentClick(d.id);
         });
 
       if (selectedAgentId) {
@@ -402,6 +423,11 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
       .on("mouseout", () => {
         tooltip.transition().duration(500).style("opacity", 0);
       })
+      .on("click", (event, d: any) => {
+        if (d.type === 'agent') {
+          handleAgentClick(d.id);
+        }
+      })
       .attr("fill", (d: any) => QUANTUM_COLORS[d.type as keyof typeof QUANTUM_COLORS])
       .attr("filter", (d: any) => d.val > 75 ? `url(#glow-${d.type})` : "none")
       .attr("cursor", "pointer");
@@ -525,6 +551,110 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
       </div>
 
       <svg ref={svgRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
+
+      {/* AGENT DETAIL OVERLAY */}
+      <AnimatePresence>
+        {detailAgent && (
+          <motion.div 
+            initial={{ opacity: 0, x: 100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 100 }}
+            className="absolute top-0 right-0 w-full md:w-[450px] h-full bg-black/90 backdrop-blur-2xl border-l border-white/10 z-[100] overflow-y-auto shadow-[-20px_0_50px_rgba(0,0,0,0.5)]"
+          >
+            <div className="p-8 space-y-8">
+              <div className="flex justify-between items-start">
+                <div className="space-y-1">
+                  <div className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] font-mono">Agent_Profile_v{agentBenchmarks?.version || detailAgent.version}</div>
+                  <h2 className="text-3xl font-black text-white tracking-tighter leading-tight">{detailAgent.name}</h2>
+                </div>
+                <button 
+                  onClick={() => { setDetailAgent(null); setAgentBenchmarks(null); }}
+                  className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 transition-colors"
+                >
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white/5 p-5 rounded-3xl border border-white/5 space-y-2">
+                  <div className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Sustainability_Score</div>
+                  <div className="text-2xl font-black text-emerald-400 font-mono">{detailAgent.greenScore}%</div>
+                </div>
+                <div className="bg-white/5 p-5 rounded-3xl border border-white/5 space-y-2">
+                  <div className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Accuracy_S-Score</div>
+                  <div className="text-2xl font-black text-blue-400 font-mono">{detailAgent.sScore.toFixed(1)}%</div>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <div className="text-[11px] font-black text-white uppercase tracking-[0.2em] border-b border-white/10 pb-2">Core_Telemetry</div>
+                
+                <div className="space-y-4">
+                  {[
+                    { label: 'Energy_Per_Token', value: `${detailAgent.energyPerToken} J/t`, progress: detailAgent.energyPerToken * 100, color: 'bg-amber-500' },
+                    { label: 'Carbon_Intensity', value: `${detailAgent.carbonIntensity} g`, progress: detailAgent.carbonIntensity * 500, color: 'bg-red-500' },
+                    { label: 'Memory_Efficiency', value: `${detailAgent.memoryEfficiency}%`, progress: detailAgent.memoryEfficiency, color: 'bg-blue-500' },
+                    { label: 'Quantum_Error_Correction', value: `${detailAgent.quantumErrorCorrection}%`, progress: detailAgent.quantumErrorCorrection, color: 'bg-violet-500' },
+                  ].map((metric, idx) => (
+                    <div key={idx} className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{metric.label}</span>
+                        <span className="text-[11px] font-mono font-bold text-white">{metric.value}</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.min(100, metric.progress)}%` }}
+                          className={`h-full ${metric.color}`}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-4">
+                <div className="text-[11px] font-black text-white uppercase tracking-[0.2em] border-b border-white/10 pb-2">Performance_Benchmarks</div>
+                {isLoadingBenchmarks ? (
+                  <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                    <div className="w-8 h-8 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
+                    <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">Querying_Agent_Nexus...</span>
+                  </div>
+                ) : agentBenchmarks ? (
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <p className="text-xs text-gray-400 leading-relaxed italic">
+                      "{agentBenchmarks.performanceSummary}"
+                    </p>
+                    <div className="grid grid-cols-1 gap-3">
+                      {Object.entries(agentBenchmarks.benchmarks).map(([key, val]: [string, any]) => (
+                        <div key={key} className="flex items-center justify-between bg-white/5 px-4 py-3 rounded-2xl border border-white/5">
+                          <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{key.replace('_', ' ')}</span>
+                          <span className="text-sm font-mono font-bold text-white">{val}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <button 
+                      onClick={() => handleAgentClick(detailAgent.id)}
+                      className="text-[10px] font-black text-emerald-500 uppercase tracking-widest hover:text-emerald-400 transition-colors"
+                    >
+                      Retry_Benchmark_Sync
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-8">
+                <button className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[11px] uppercase tracking-[0.3em] rounded-2xl transition-all active:scale-95 shadow-lg shadow-emerald-500/20">
+                  Deploy_To_Orchestrator
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

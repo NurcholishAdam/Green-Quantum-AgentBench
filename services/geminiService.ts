@@ -295,6 +295,47 @@ export const getProvenanceTelemetry = async (insights: any[]): Promise<any[]> =>
   } catch (error) { return insights; }
 };
 
+/**
+ * Fetches latest performance benchmarks and version info for an agent using Gemini.
+ */
+export const getAgentBenchmarks = async (agent: AgentBenchmark): Promise<{ version: string; performanceSummary: string; benchmarks: Record<string, number> }> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Provide the latest performance benchmarks and version info for the AI agent: ${agent.name} (ID: ${agent.id}). 
+      Include a performance summary and a few specific benchmark scores (e.g., MMLU, GSM8K, or custom sustainability metrics).
+      Current version is ${agent.version}.`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            version: { type: Type.STRING },
+            performanceSummary: { type: Type.STRING },
+            benchmarks: {
+              type: Type.OBJECT,
+              properties: {
+                mmlu: { type: Type.NUMBER },
+                gsm8k: { type: Type.NUMBER },
+                sustainability_index: { type: Type.NUMBER }
+              }
+            }
+          },
+          required: ["version", "performanceSummary", "benchmarks"]
+        }
+      }
+    });
+    return JSON.parse(response.text || "{}");
+  } catch (error) {
+    return {
+      version: agent.version,
+      performanceSummary: "Performance data currently unavailable due to network flux.",
+      benchmarks: { mmlu: 0, gsm8k: 0, sustainability_index: agent.greenScore }
+    };
+  }
+};
+
 export function encodeAudio(bytes: Uint8Array) {
   let binary = '';
   for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
