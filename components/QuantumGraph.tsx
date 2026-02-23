@@ -16,7 +16,7 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [graphData, setGraphData] = useState<QuantumGraphData>(initialData);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [viewMode, setViewMode] = useState<'graph' | 'pareto'>('graph');
+  const [viewMode, setViewMode] = useState<'graph' | 'pareto' | 'resources'>('graph');
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(MOCK_AGENTS[0].id);
   const [detailAgent, setDetailAgent] = useState<AgentBenchmark | null>(null);
   const [agentBenchmarks, setAgentBenchmarks] = useState<any>(null);
@@ -264,6 +264,131 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
       return;
     }
 
+    if (viewMode === 'resources') {
+      svg.selectAll("*").remove();
+      if (simulationRef.current) {
+        simulationRef.current.stop();
+        simulationRef.current = null;
+      }
+
+      const margin = { top: 80, right: 40, bottom: 120, left: 80 };
+      const innerWidth = width - margin.left - margin.right;
+      const innerHeight = height - margin.top - margin.bottom;
+
+      const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+      const agents = MOCK_AGENTS;
+      const subgroups = ['CPU', 'Memory', 'Energy'];
+      
+      const data = agents.map(d => ({
+        name: d.name,
+        CPU: d.latency / 4, // Normalized
+        Memory: 100 - d.memoryEfficiency, // Normalized
+        Energy: d.energyPerToken * 10, // Normalized
+        raw: d
+      }));
+
+      const x0 = d3.scaleBand()
+        .domain(data.map(d => d.name))
+        .rangeRound([0, innerWidth])
+        .paddingInner(0.2);
+
+      const x1 = d3.scaleBand()
+        .domain(subgroups)
+        .rangeRound([0, x0.bandwidth()])
+        .padding(0.05);
+
+      const y = d3.scaleLinear()
+        .domain([0, 100])
+        .range([innerHeight, 0]);
+
+      const color = d3.scaleOrdinal<string>()
+        .domain(subgroups)
+        .range(['#3b82f6', '#a855f7', '#f59e0b']); // Blue, Violet, Amber
+
+      // Axes
+      const xAxis = g.append("g")
+        .attr("transform", `translate(0,${innerHeight})`)
+        .call(d3.axisBottom(x0));
+      
+      xAxis.selectAll("text")
+        .attr("class", "font-mono text-[9px] fill-gray-500")
+        .attr("transform", "rotate(-45)")
+        .style("text-anchor", "end");
+      
+      xAxis.select(".domain").attr("stroke", "rgba(255,255,255,0.1)");
+
+      const yAxis = g.append("g")
+        .call(d3.axisLeft(y).ticks(5).tickFormat(d => `${d}%`));
+      
+      yAxis.selectAll("text").attr("class", "font-mono text-[10px] fill-gray-500");
+      yAxis.select(".domain").attr("stroke", "rgba(255,255,255,0.1)");
+
+      // Grid
+      g.append("g")
+        .attr("class", "grid opacity-5")
+        .call(d3.axisLeft(y).ticks(5).tickSize(-innerWidth).tickFormat(() => ""));
+
+      // Bars
+      const agentGroups = g.append("g")
+        .selectAll("g")
+        .data(data)
+        .enter().append("g")
+        .attr("transform", d => `translate(${x0(d.name)},0)`);
+
+      agentGroups.selectAll("rect")
+        .data(d => subgroups.map(key => ({ key, value: (d as any)[key], raw: d.raw })))
+        .enter().append("rect")
+        .attr("x", d => x1(d.key)!)
+        .attr("y", innerHeight)
+        .attr("width", x1.bandwidth())
+        .attr("height", 0)
+        .attr("fill", d => color(d.key))
+        .attr("rx", 4)
+        .attr("cursor", "pointer")
+        .on("mouseover", (event, d) => {
+          tooltip.transition().duration(200).style("opacity", 1);
+          tooltip.html(`
+            <div class="space-y-2 min-w-[180px]">
+              <div class="text-[9px] uppercase font-black tracking-widest text-gray-500 font-mono">${d.key}_Load_Audit</div>
+              <div class="text-sm font-black text-white">${d.raw.name}</div>
+              <div class="flex items-center justify-between pt-1">
+                <span class="text-[10px] text-gray-400 uppercase font-bold">Intensity</span>
+                <span class="text-sm font-mono font-bold" style="color: ${color(d.key)}">${d.value.toFixed(1)}%</span>
+              </div>
+              <div class="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-2">
+                <div class="h-full" style="width: ${d.value}%; background-color: ${color(d.key)}"></div>
+              </div>
+            </div>
+          `);
+        })
+        .on("mousemove", (event) => {
+          tooltip.style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 28) + "px");
+        })
+        .on("mouseout", () => {
+          tooltip.transition().duration(500).style("opacity", 0);
+        })
+        .on("click", (event, d) => {
+          setSelectedAgentId(d.raw.id);
+          handleAgentClick(d.raw.id);
+        })
+        .transition().duration(1000).delay((d, i) => i * 50)
+        .attr("y", d => y(d.value))
+        .attr("height", d => innerHeight - y(d.value));
+
+      // Legend
+      const legend = g.append("g")
+        .attr("transform", `translate(${innerWidth - 100}, -40)`);
+
+      subgroups.forEach((sub, i) => {
+        const legRow = legend.append("g").attr("transform", `translate(0, ${i * 15})`);
+        legRow.append("rect").attr("width", 8).attr("height", 8).attr("fill", color(sub)).attr("rx", 2);
+        legRow.append("text").attr("x", 15).attr("y", 8).attr("fill", "#666").attr("class", "text-[8px] font-black uppercase tracking-widest font-mono").text(sub);
+      });
+
+      return;
+    }
+
     const safeNodes = graphData.nodes || [];
     const safeLinks = graphData.links || [];
 
@@ -482,6 +607,12 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
             className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${viewMode === 'pareto' ? 'bg-emerald-500 text-black' : 'text-gray-500 hover:text-white'}`}
           >
             Pareto
+          </button>
+          <button 
+            onClick={() => setViewMode('resources')}
+            className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${viewMode === 'resources' ? 'bg-emerald-500 text-black' : 'text-gray-500 hover:text-white'}`}
+          >
+            Resources
           </button>
         </div>
         <button 
