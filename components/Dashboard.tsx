@@ -22,6 +22,7 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
   const [selectedAgentId, setSelectedAgentId] = useState<string>(MOCK_AGENTS[0].id);
   const [gridData, setGridData] = useState<GridContext | null>(null);
   const [chaosNotice, setChaosNotice] = useState<string | null>(null);
+  const [cumulativeSavings, setCumulativeSavings] = useState<number>(0);
 
   const selectedAgent = useMemo(() => 
     MOCK_AGENTS.find(a => a.id === selectedAgentId) || MOCK_AGENTS[0], 
@@ -70,9 +71,11 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
     const monitorChaos = async () => {
       const notice = await getChaosNotice(selectedAgent);
       setChaosNotice(notice);
+      // Simulate cumulative savings growth as user monitors agents
+      setCumulativeSavings(prev => prev + (savingsGrams * 0.1));
     };
     monitorChaos();
-  }, [selectedAgent]);
+  }, [selectedAgent, savingsGrams]);
 
   const radarData = useMemo(() => [
     { subject: 'Latency', A: (1 - selectedAgent.latency / 500) * 100 },
@@ -99,7 +102,7 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
                <div className="space-y-2">
                   <h2 className="text-[11px] font-black text-emerald-400 uppercase tracking-[0.5em] font-mono italic">Regional_Grid_Reactive_Audit</h2>
                   <p className="text-4xl font-black text-white tracking-tighter max-w-lg leading-tight">
-                    Preventing <span className="text-emerald-500">{(savingsGrams * 42).toFixed(2)}g</span> of carbon leakage.
+                    Net Carbon Saved: <span className="text-emerald-500">{cumulativeSavings.toFixed(2)}g</span>
                   </p>
                   <div className="flex items-center gap-8 pt-3">
                      <div className="flex items-center gap-3 text-[10px] font-black text-emerald-500/60 uppercase font-mono">
@@ -130,6 +133,58 @@ const Dashboard: React.FC<Props> = ({ hwProfile }) => {
             </div>
             <p className="text-[9px] text-gray-600 font-mono uppercase tracking-widest">Task Ratio / Energy Per Bit</p>
          </div>
+      </div>
+
+      {/* Comparative "Shadow" Benchmark Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="bg-[#0d0d0d] border border-red-500/10 p-10 rounded-[3rem] shadow-xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-8 opacity-5">
+            <i className="fa-solid fa-ghost text-6xl text-red-500"></i>
+          </div>
+          <div className="space-y-6">
+            <div className="text-[10px] font-black text-red-500 uppercase tracking-widest font-mono italic">Shadow_Legacy_Baseline</div>
+            <h3 className="text-2xl font-black text-white tracking-tight">Standard Agent</h3>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-1">
+                <div className="text-[9px] text-gray-600 uppercase font-black">Energy Intensity</div>
+                <div className="text-xl font-mono font-bold text-red-400">{(selectedAgent.energyPerToken * 2.5).toFixed(2)} μJ</div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-[9px] text-gray-600 uppercase font-black">Latency</div>
+                <div className="text-xl font-mono font-bold text-red-400">{(selectedAgent.latency * 1.8).toFixed(0)} ms</div>
+              </div>
+            </div>
+            <div className="pt-4 border-t border-white/5">
+              <div className="text-[9px] text-gray-500 italic">"Unoptimized H100 cluster without carbon-aware pruning."</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-[#0d0d0d] border border-emerald-500/20 p-10 rounded-[3rem] shadow-2xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-8 opacity-5">
+            <i className="fa-solid fa-leaf text-6xl text-emerald-500"></i>
+          </div>
+          <div className="space-y-6">
+            <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest font-mono italic">Green_Optimized_Node</div>
+            <h3 className="text-2xl font-black text-white tracking-tight">Your Green Agent</h3>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-1">
+                <div className="text-[9px] text-gray-600 uppercase font-black">Energy Intensity</div>
+                <div className="text-xl font-mono font-bold text-emerald-400">{selectedAgent.energyPerToken.toFixed(2)} μJ</div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-[9px] text-gray-600 uppercase font-black">Latency</div>
+                <div className="text-xl font-mono font-bold text-emerald-400">{selectedAgent.latency} ms</div>
+              </div>
+            </div>
+            <div className="pt-4 border-t border-white/5">
+              <div className="text-[9px] text-emerald-500/60 font-black uppercase tracking-widest flex items-center gap-2">
+                <i className="fa-solid fa-circle-check"></i>
+                Carbon-Aware Pruning Enabled
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">

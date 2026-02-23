@@ -15,6 +15,7 @@ const OrchestratorView: React.FC<Props> = ({ hwType }) => {
   const [refinement, setRefinement] = useState<GreenRefinement | null>(null);
   const [loading, setLoading] = useState(false);
   const [isRefining, setIsRefining] = useState(false);
+  const [showEcoIntercept, setShowEcoIntercept] = useState(false);
   const [budget, setBudget] = useState(5.0);
 
   // Initialize Grid Data for Throttling
@@ -62,6 +63,12 @@ const OrchestratorView: React.FC<Props> = ({ hwType }) => {
   const isGridDirty = useMemo(() => grid?.status === 'Dirty', [grid]);
 
   const handleGeneratePlan = async () => {
+    if (!refinement && !showEcoIntercept) {
+      setShowEcoIntercept(true);
+      handleRefine();
+      return;
+    }
+
     setLoading(true);
     // Explicitly inject Eco-Mode instructions if grid is dirty to ensure Gemini prioritizes pruning
     const augmentedTask = isGridDirty 
@@ -130,6 +137,36 @@ const OrchestratorView: React.FC<Props> = ({ hwType }) => {
       }`}>
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 via-transparent to-transparent opacity-20"></div>
         
+        {showEcoIntercept && refinement && (
+          <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-xl flex items-center justify-center p-12 animate-in fade-in duration-500">
+            <div className="max-w-xl w-full bg-[#0d0d0d] border border-emerald-500/30 p-10 rounded-[3rem] shadow-2xl space-y-8 text-center">
+              <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-4xl text-emerald-500 mx-auto">
+                <i className="fa-solid fa-leaf"></i>
+              </div>
+              <div className="space-y-4">
+                <h3 className="text-2xl font-black text-white tracking-tight">Eco-Optimization Detected</h3>
+                <p className="text-gray-400 text-[15px] leading-relaxed">
+                  "If I simplify this query, I can save <span className="text-emerald-500 font-bold">{refinement.estimatedSavings} energy</span> with <span className="text-blue-400 font-bold">98% the same accuracy</span>. Shall I proceed?"
+                </p>
+              </div>
+              <div className="flex flex-col gap-4">
+                <button 
+                  onClick={() => { applyRefinement(); setShowEcoIntercept(false); }}
+                  className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-black uppercase rounded-2xl shadow-xl shadow-emerald-500/20 transition-all active:scale-95"
+                >
+                  Proceed with Eco-Optimization
+                </button>
+                <button 
+                  onClick={() => { setShowEcoIntercept(false); handleGeneratePlan(); }}
+                  className="w-full py-5 bg-white/5 hover:bg-white/10 text-gray-500 text-[11px] font-black uppercase rounded-2xl transition-all"
+                >
+                  Continue with Original (High Energy)
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col md:flex-row items-center justify-between mb-10 gap-8">
            <div className="space-y-2 text-center md:text-left">
              <h3 className="text-[12px] font-black text-emerald-500 uppercase tracking-[0.4em] font-mono flex items-center gap-4 justify-center md:justify-start">
