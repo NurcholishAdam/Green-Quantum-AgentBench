@@ -56,7 +56,18 @@ const GreenParetoChart: React.FC<Props> = ({ agents, selectedAgentId }) => {
           />
           
           {/* Pareto Frontier Shading */}
-          <ReferenceArea x1={0} x2={0.15} y1={90} y2={100} fill="rgba(16, 185, 129, 0.05)" stroke="#10b981" strokeOpacity={0.1} strokeDasharray="3 3" />
+          <ReferenceArea 
+            {...({
+              x1: 0, 
+              x2: 0.15, 
+              y1: 90, 
+              y2: 100, 
+              fill: "rgba(16, 185, 129, 0.05)", 
+              stroke: "#10b981", 
+              strokeOpacity: 0.1, 
+              strokeDasharray: "3 3" 
+            } as any)}
+          />
           
           <Scatter name="Agent Efficiency" data={chartData}>
             {chartData.map((entry, index) => (

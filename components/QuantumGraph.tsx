@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
-import { QuantumGraphData, GraphNode, GraphLink } from '../types';
-import { QUANTUM_COLORS } from '../constants';
+import { QuantumGraphData, GraphNode, GraphLink, AgentBenchmark } from '../types';
+import { QUANTUM_COLORS, MOCK_AGENTS } from '../constants';
 import { getGraphTelemetry } from '../services/geminiService';
 
 interface Props {
@@ -15,6 +15,8 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [graphData, setGraphData] = useState<QuantumGraphData>(initialData);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [viewMode, setViewMode] = useState<'graph' | 'pareto'>('graph');
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(MOCK_AGENTS[0].id);
   const [visibleTypes, setVisibleTypes] = useState<Set<string>>(new Set(['quantum', 'agent', 'error', 'provenance', 'policy', 'hardware']));
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
 
@@ -77,6 +79,169 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
     const height = svgRef.current.clientHeight || 450;
     const svg = d3.select(svgRef.current);
     const tooltip = d3.select(tooltipRef.current);
+
+    if (viewMode === 'pareto') {
+      svg.selectAll("*").remove();
+      if (simulationRef.current) {
+        simulationRef.current.stop();
+        simulationRef.current = null;
+      }
+
+      const margin = { top: 80, right: 80, bottom: 100, left: 100 };
+      const innerWidth = width - margin.left - margin.right;
+      const innerHeight = height - margin.top - margin.bottom;
+
+      const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+      // Data preparation
+      const agents = MOCK_AGENTS;
+      const sortedAgents = [...agents].sort((a, b) => {
+        if (a.energyPerToken !== b.energyPerToken) return a.energyPerToken - b.energyPerToken;
+        return b.sScore - a.sScore;
+      });
+
+      const frontier: AgentBenchmark[] = [];
+      let maxAccuracy = -1;
+      for (const agent of sortedAgents) {
+        if (agent.sScore > maxAccuracy) {
+          frontier.push(agent);
+          maxAccuracy = agent.sScore;
+        }
+      }
+
+      const frontierSet = new Set(frontier.map(a => a.id));
+
+      // Scales
+      const xScale = d3.scaleLinear()
+        .domain([0, d3.max(agents, d => d.energyPerToken)! * 1.2])
+        .range([0, innerWidth]);
+
+      const yScale = d3.scaleLinear()
+        .domain([0, 100])
+        .range([innerHeight, 0]);
+
+      // Grid lines
+      g.append("g")
+        .attr("class", "grid opacity-5")
+        .call(d3.axisBottom(xScale).ticks(5).tickSize(innerHeight).tickFormat(() => ""));
+
+      g.append("g")
+        .attr("class", "grid opacity-5")
+        .call(d3.axisLeft(yScale).ticks(5).tickSize(-innerWidth).tickFormat(() => ""));
+
+      // Axes
+      const xAxis = g.append("g")
+        .attr("transform", `translate(0,${innerHeight})`)
+        .call(d3.axisBottom(xScale).ticks(5).tickFormat(d => `${d} J/t`));
+      
+      xAxis.selectAll("text").attr("class", "font-mono text-[10px] fill-gray-500");
+      xAxis.select(".domain").attr("stroke", "rgba(255,255,255,0.1)");
+
+      const yAxis = g.append("g")
+        .call(d3.axisLeft(yScale).ticks(5).tickFormat(d => `${d}%`));
+      
+      yAxis.selectAll("text").attr("class", "font-mono text-[10px] fill-gray-500");
+      yAxis.select(".domain").attr("stroke", "rgba(255,255,255,0.1)");
+
+      // Labels
+      g.append("text")
+        .attr("x", innerWidth / 2)
+        .attr("y", innerHeight + 60)
+        .attr("fill", "#666")
+        .attr("text-anchor", "middle")
+        .attr("class", "text-[10px] font-black uppercase tracking-[0.3em] font-mono")
+        .text("Energy_Intensity (J/Token)");
+
+      g.append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("x", -innerHeight / 2)
+        .attr("y", -60)
+        .attr("fill", "#666")
+        .attr("text-anchor", "middle")
+        .attr("class", "text-[10px] font-black uppercase tracking-[0.3em] font-mono")
+        .text("Model_Accuracy (S-Score)");
+
+      // Frontier Line
+      const lineGenerator = d3.line<AgentBenchmark>()
+        .x(d => xScale(d.energyPerToken))
+        .y(d => yScale(d.sScore))
+        .curve(d3.curveStepAfter);
+
+      g.append("path")
+        .datum(frontier)
+        .attr("fill", "none")
+        .attr("stroke", "#10b981")
+        .attr("stroke-width", 2)
+        .attr("stroke-dasharray", "8,4")
+        .attr("opacity", 0.4)
+        .attr("d", lineGenerator);
+
+      // Points
+      const points = g.selectAll(".dot")
+        .data(agents)
+        .enter().append("g")
+        .attr("class", "dot-group")
+        .attr("transform", d => `translate(${xScale(d.energyPerToken)},${yScale(d.sScore)})`);
+
+      points.append("circle")
+        .attr("r", d => d.id === selectedAgentId ? 12 : 8)
+        .attr("fill", d => frontierSet.has(d.id) ? "#10b981" : "#3b82f6")
+        .attr("fill-opacity", d => d.id === selectedAgentId ? 1 : 0.6)
+        .attr("stroke", d => d.id === selectedAgentId ? "#fff" : "none")
+        .attr("stroke-width", 2)
+        .attr("cursor", "pointer")
+        .on("mouseover", (event, d) => {
+          tooltip.transition().duration(200).style("opacity", 1);
+          tooltip.html(`
+            <div class="space-y-3 min-w-[220px]">
+              <div class="flex items-center justify-between border-b border-white/10 pb-2">
+                <span class="text-[9px] uppercase font-black tracking-widest ${frontierSet.has(d.id) ? 'text-emerald-500' : 'text-blue-500'} font-mono">
+                  ${frontierSet.has(d.id) ? 'Frontier_Optimal' : 'Sub_Optimal'}
+                </span>
+                <span class="text-[8px] font-mono text-white/30 italic">v${d.version}</span>
+              </div>
+              <div class="text-lg font-black text-white tracking-tight">${d.name}</div>
+              <div class="grid grid-cols-2 gap-4 pt-1">
+                <div class="space-y-1">
+                  <div class="text-[8px] text-gray-500 uppercase font-black">Energy</div>
+                  <div class="text-sm font-mono font-bold text-white">${d.energyPerToken} <span class="text-[9px] text-gray-600">J/t</span></div>
+                </div>
+                <div class="space-y-1">
+                  <div class="text-[8px] text-gray-500 uppercase font-black">Accuracy</div>
+                  <div class="text-sm font-mono font-bold text-white">${d.sScore}%</div>
+                </div>
+              </div>
+              <div class="pt-2">
+                <div class="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                  <div class="h-full ${frontierSet.has(d.id) ? 'bg-emerald-500' : 'bg-blue-500'}" style="width: ${d.sScore}%"></div>
+                </div>
+              </div>
+            </div>
+          `);
+        })
+        .on("mousemove", (event) => {
+          tooltip.style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 28) + "px");
+        })
+        .on("mouseout", () => {
+          tooltip.transition().duration(500).style("opacity", 0);
+        })
+        .on("click", (event, d) => {
+          setSelectedAgentId(d.id);
+        });
+
+      if (selectedAgentId) {
+        points.filter(d => d.id === selectedAgentId)
+          .append("circle")
+          .attr("r", 20)
+          .attr("fill", "none")
+          .attr("stroke", "#fff")
+          .attr("stroke-width", 1)
+          .attr("stroke-dasharray", "2,2")
+          .attr("class", "animate-spin-slow");
+      }
+
+      return;
+    }
 
     const safeNodes = graphData.nodes || [];
     const safeLinks = graphData.links || [];
@@ -254,7 +419,7 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
     });
 
     sim.alpha(0.15).restart();
-  }, [graphData, visibleTypes]);
+  }, [graphData, visibleTypes, viewMode, selectedAgentId]);
 
   const fullNodes = graphData?.nodes || [];
   const activeNodes = fullNodes.filter(n => visibleTypes.has(n.type));
@@ -279,6 +444,20 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
       </div>
 
       <div className="absolute top-10 right-12 z-10 flex items-center gap-2 bg-black/40 backdrop-blur-md p-1.5 rounded-2xl border border-white/5">
+        <div className="flex bg-white/5 rounded-xl p-1 mr-2">
+          <button 
+            onClick={() => setViewMode('graph')}
+            className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${viewMode === 'graph' ? 'bg-emerald-500 text-black' : 'text-gray-500 hover:text-white'}`}
+          >
+            Graph
+          </button>
+          <button 
+            onClick={() => setViewMode('pareto')}
+            className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${viewMode === 'pareto' ? 'bg-emerald-500 text-black' : 'text-gray-500 hover:text-white'}`}
+          >
+            Pareto
+          </button>
+        </div>
         <button 
           onClick={fetchUpdate}
           disabled={isSyncing}
