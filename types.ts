@@ -54,6 +54,11 @@ export interface OrchestrationPlan {
     savingsGrams: number;
     percentage: number;
   };
+  usageMetadata?: {
+    thoughtTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
 }
 
 export interface GreenRefinement {

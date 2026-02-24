@@ -94,7 +94,7 @@ export const getSupervisorPlan = async (
   
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3.1-pro-preview-customtools",
       contents: `Task: "${task}"
       Global Carbon Budget: ${budget}g CO2. Hardware: ${hwType}.
       LIVE GRID STATUS: ${gridStatus} (${grid?.intensity} gCO2/kWh in ${grid?.region}).
@@ -145,7 +145,17 @@ export const getSupervisorPlan = async (
       }
     });
     const plan = JSON.parse(response.text || "{}") as OrchestrationPlan;
-    return { ...plan, gridContext: grid };
+    const usage = (response as any).usageMetadata;
+    
+    return { 
+      ...plan, 
+      gridContext: grid,
+      usageMetadata: usage ? {
+        thoughtTokens: usage.thought_thought_tokens || usage.total_thought_tokens || usage.total_reasoning_tokens || 0,
+        completionTokens: usage.candidates_token_count || 0,
+        totalTokens: usage.total_token_count || 0
+      } : undefined
+    };
   } catch (error) {
     return { 
       reasoning: "Throttling active due to supervisor signal loss.", 

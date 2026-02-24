@@ -1,6 +1,6 @@
 {
   "name": "Green-Quantum AgentBench",
-  "description": "A sophisticated benchmarking suite for sustainable AI agents, integrating quantum-limit graph architectures, error correction metrics, and multilingual provenance tracking for the AgentBeats ecosystem.",
+  "description": "A sophisticated benchmarking suite for sustainable AI agents, featuring Gemini 3.1 Pro Custom Tools integration, Thought Token monitoring, and side-by-side Compare Mode for Quantum-Pruning validation.",
   "requestFramePermissions": [
     "microphone",
     "geolocation"

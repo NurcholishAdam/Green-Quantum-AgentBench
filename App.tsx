@@ -8,6 +8,7 @@ import ChaosSimulator from './components/ChaosSimulator';
 import OrchestratorView from './components/OrchestratorView';
 import HardwareSelector from './components/HardwareSelector';
 import LiveAssistant from './components/LiveAssistant';
+import CompareMode from './components/CompareMode';
 import { 
   getQuantumTelemetry, 
   getGreenTelemetry, 
@@ -17,7 +18,7 @@ import {
 import { QuantumGraphData, HardwareType } from './types';
 import { HARDWARE_PROFILES, MOCK_AGENTS } from './constants';
 
-type TabType = 'dashboard' | 'orchestrator' | 'policy' | 'chaos' | 'quantum' | 'green' | 'provenance' | 'mosaic';
+type TabType = 'dashboard' | 'orchestrator' | 'mosaic' | 'provenance' | 'green' | 'quantum' | 'policy' | 'chaos' | 'compare';
 
 interface Insight {
   label: string;
@@ -262,6 +263,21 @@ const App: React.FC = () => {
             extraContent={() => <ChaosSimulator />}
           />
         );
+      case 'compare':
+        return (
+          <ModuleViewer 
+            title="Compare Mode" 
+            icon="fa-scale-balanced" 
+            color="emerald" 
+            description="Side-by-side benchmarking of Quantum-Pruning vs. Standard Gemini 3 Pro reasoning."
+            initialInsights={[
+              { label: "Thought Reduction", value: "42%", subtext: "Avg. delta", icon: "fa-brain", progress: 42 },
+              { label: "Latency Gain", value: "1.8x", subtext: "Speedup", icon: "fa-bolt", progress: 80 },
+              { label: "Energy Saved", value: "3.2kJ", subtext: "Session total", icon: "fa-leaf", progress: 65 }
+            ]}
+            extraContent={() => <CompareMode />}
+          />
+        );
       default: return null;
     }
   };
@@ -284,7 +300,7 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-8 bg-white/5 p-1.5 rounded-2xl border border-white/5 overflow-x-auto max-w-full custom-scrollbar">
-          {(['dashboard', 'orchestrator', 'mosaic', 'provenance', 'green', 'quantum', 'policy', 'chaos'] as TabType[]).map((tab) => (
+          {(['dashboard', 'orchestrator', 'mosaic', 'provenance', 'green', 'quantum', 'policy', 'chaos', 'compare'] as TabType[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { getSupervisorPlan, refineGreenPrompt, getRegionalCarbonIntensity } from '../services/geminiService';
 import { AgentBenchmark, HardwareType, OrchestrationPlan, GreenRefinement, GridContext } from '../types';
 import { MOCK_AGENTS } from '../constants';
+import ThoughtTokensGraph from './ThoughtTokensGraph';
 
 interface Props {
   hwType: HardwareType;
@@ -319,6 +320,15 @@ const OrchestratorView: React.FC<Props> = ({ hwType }) => {
                    )}
                 </div>
              </div>
+
+             {plan.usageMetadata && (
+               <div className="mt-8">
+                <ThoughtTokensGraph 
+                  thoughtTokens={plan.usageMetadata.thoughtTokens} 
+                  completionTokens={plan.usageMetadata.completionTokens} 
+                />
+               </div>
+             )}
           </div>
 
           {/* Sub-Task Execution Map */}

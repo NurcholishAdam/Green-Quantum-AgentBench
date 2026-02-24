@@ -687,15 +687,15 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
                     <div className="text-sm font-mono font-bold text-white">{tooltip.data.energyPerToken} <span className="text-[9px] text-gray-600">J/t</span></div>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-[8px] text-gray-500 uppercase font-black">Accuracy</div>
-                    <div className="text-sm font-mono font-bold text-white">{tooltip.data.sScore}%</div>
+                    <div className="text-[8px] text-gray-500 uppercase font-black">S-Score</div>
+                    <div className="text-sm font-mono font-bold text-white">{tooltip.data.sScore.toFixed(2)}</div>
                   </div>
                 </div>
                 <button 
                   onClick={() => { handleAgentClick(tooltip.data.id); setTooltip(null); }}
                   className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 text-black text-[9px] font-black uppercase rounded-xl transition-all mt-2"
                 >
-                  Inspect_Agent_Nexus
+                  View_Agent_Profile
                 </button>
               </div>
             )}
