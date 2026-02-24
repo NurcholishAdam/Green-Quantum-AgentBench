@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useSpring, useTransform } from 'motion/react';
 import ForceGraph2D from 'react-force-graph-2d';
 
 interface TokenStream {
@@ -80,6 +80,58 @@ const EnergyStackedBar: React.FC<{ thought: number; action: number; label: strin
   );
 };
 
+const VimRagComparisonChart: React.FC = () => {
+  return (
+    <motion.div 
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      exit={{ opacity: 0, height: 0 }}
+      className="bg-black/40 border border-white/5 rounded-[2rem] p-6 space-y-4 overflow-hidden"
+    >
+      <div className="flex justify-between items-center">
+        <h4 className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Multi-Hop Retrieval Audit</h4>
+        <div className="text-[9px] font-mono text-emerald-500 font-black">-55% Tokens</div>
+      </div>
+      
+      <div className="space-y-4">
+        {/* Standard Bar */}
+        <div className="space-y-1.5">
+          <div className="flex justify-between text-[8px] font-mono text-gray-500 uppercase tracking-tighter">
+            <span>Standard AgentBench</span>
+            <span>1,240 tokens</span>
+          </div>
+          <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: '100%' }}
+              className="h-full bg-gray-600"
+            />
+          </div>
+        </div>
+
+        {/* VimRAG Bar */}
+        <div className="space-y-1.5">
+          <div className="flex justify-between text-[8px] font-mono text-emerald-400 uppercase tracking-tighter">
+            <span>VimRAG-Inspired Graph</span>
+            <span>558 tokens</span>
+          </div>
+          <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: '45%' }}
+              className="h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+            />
+          </div>
+        </div>
+      </div>
+      
+      <p className="text-[8px] text-gray-600 italic leading-relaxed">
+        VimRAG prunes irrelevant retrieval paths in real-time, preventing token bloat in complex multi-hop reasoning tasks.
+      </p>
+    </motion.div>
+  );
+};
+
 const CompareMode: React.FC = () => {
   const [isComparing, setIsComparing] = useState(false);
   const [prompt, setPrompt] = useState('Optimize this recursive quantum-pruning loop for a mobile NPU with 2GB RAM budget.');
@@ -87,10 +139,20 @@ const CompareMode: React.FC = () => {
   const [standardStream, setStandardStream] = useState<TokenStream[]>([]);
   const [loading, setLoading] = useState(false);
   const [liveDelta, setLiveDelta] = useState<number>(0);
+  
+  const springDelta = useSpring(0, { stiffness: 50, damping: 20 });
+  const displayDelta = useTransform(springDelta, (v) => v.toFixed(0));
+  const progressWidth = useTransform(springDelta, (v) => `${Math.max(5, v)}%`);
+
+  useEffect(() => {
+    springDelta.set(liveDelta);
+  }, [liveDelta, springDelta]);
+
   const [report, setReport] = useState<ComparisonReport | null>(null);
   const [thinkingLevel, setThinkingLevel] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('MEDIUM');
   const [activeSignature, setActiveSignature] = useState<string | null>(null);
   const [vimRagEnabled, setVimRagEnabled] = useState(true);
+  const [showVimRagComparison, setShowVimRagComparison] = useState(false);
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
   const graphRef = useRef<any>();
 
@@ -351,11 +413,32 @@ const CompareMode: React.FC = () => {
                 />
               </button>
             </div>
+            <div className="flex justify-between items-center">
+              <div className="text-[9px] font-black text-gray-700 uppercase tracking-widest">Before_vs_After_VimRAG</div>
+              <button 
+                onClick={() => setShowVimRagComparison(!showVimRagComparison)}
+                className={`w-10 h-5 rounded-full relative transition-all ${showVimRagComparison ? 'bg-violet-500' : 'bg-gray-800'}`}
+              >
+                <motion.div 
+                  animate={{ x: showVimRagComparison ? 20 : 2 }}
+                  className="absolute top-1 left-0 w-3 h-3 bg-white rounded-full shadow-sm"
+                />
+              </button>
+            </div>
             <div className="flex items-center justify-between text-[10px] font-mono">
               <span className="text-gray-500 uppercase">Token_Efficiency</span>
               <span className={vimRagEnabled ? 'text-emerald-400' : 'text-gray-600'}>
                 {vimRagEnabled ? 'T_e: +50%' : 'Baseline'}
               </span>
+            </div>
+            <div className="flex items-center justify-between text-[10px] font-mono">
+              <span className="text-gray-500 uppercase">Signature_Persistence</span>
+              <div className="flex items-center gap-2">
+                <div className={`w-1.5 h-1.5 rounded-full ${activeSignature ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'}`}></div>
+                <span className={activeSignature ? 'text-emerald-400' : 'text-red-400'}>
+                  {activeSignature ? 'Active' : 'Inactive'}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -378,6 +461,10 @@ const CompareMode: React.FC = () => {
               </button>
             )}
           </div>
+
+          <AnimatePresence>
+            {showVimRagComparison && <VimRagComparisonChart />}
+          </AnimatePresence>
         </div>
 
         {isComparing && (
@@ -388,12 +475,8 @@ const CompareMode: React.FC = () => {
               </div>
               <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Live_Efficiency_Verdict</div>
               <div className="text-5xl font-black text-white tracking-tighter">
-                <motion.span
-                  key={liveDelta}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  -{liveDelta.toFixed(0)}%
+                <motion.span>
+                  -{displayDelta}%
                 </motion.span>
               </div>
               
@@ -404,7 +487,7 @@ const CompareMode: React.FC = () => {
                 </div>
                 <div className="h-1.5 bg-white/5 rounded-full overflow-hidden flex gap-0.5">
                    <motion.div 
-                     animate={{ width: `${Math.max(5, liveDelta)}%` }}
+                     style={{ width: progressWidth }}
                      className="h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"
                    />
                    <div className="flex-grow bg-white/5"></div>
@@ -743,6 +826,68 @@ const CompareMode: React.FC = () => {
                     </div>
                     <div className="h-1 bg-white/5 rounded-full overflow-hidden flex">
                       <div className="h-full bg-emerald-500" style={{ width: `${(report.green.energyUsage / (report.standard.energyUsage || 1)) * 100}%` }}></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Detailed Metric Breakdown */}
+              <div className="pt-10 border-t border-white/5 space-y-8">
+                <div className="flex items-center gap-3">
+                  <div className="w-1 h-4 bg-emerald-500 rounded-full"></div>
+                  <div className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Detailed_Metric_Breakdown</div>
+                </div>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                  {/* Green Agent Details */}
+                  <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-[2rem] p-8 space-y-6">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Green_Agent_Audit</span>
+                      <span className="text-[9px] font-mono text-emerald-500/60 uppercase">Optimized</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-1">
+                        <div className="text-[9px] text-gray-600 uppercase">Thought Tokens</div>
+                        <div className="text-xl font-black text-white font-mono">{report.green.thoughtTokens}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-[9px] text-gray-600 uppercase">Action Tokens</div>
+                        <div className="text-xl font-black text-white font-mono">{report.green.actionTokens}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-[9px] text-gray-600 uppercase">Total Tokens</div>
+                        <div className="text-xl font-black text-white font-mono">{report.green.totalTokens}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-[9px] text-gray-600 uppercase">Energy (uJ)</div>
+                        <div className="text-xl font-black text-emerald-500 font-mono">{report.green.energyUsage.toFixed(1)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Standard Agent Details */}
+                  <div className="bg-white/5 border border-white/5 rounded-[2rem] p-8 space-y-6">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Standard_Agent_Audit</span>
+                      <span className="text-[9px] font-mono text-gray-600 uppercase">Baseline</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-1">
+                        <div className="text-[9px] text-gray-600 uppercase">Thought Tokens</div>
+                        <div className="text-xl font-black text-white font-mono">{report.standard.thoughtTokens}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-[9px] text-gray-600 uppercase">Action Tokens</div>
+                        <div className="text-xl font-black text-white font-mono">{report.standard.actionTokens}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-[9px] text-gray-600 uppercase">Total Tokens</div>
+                        <div className="text-xl font-black text-white font-mono">{report.standard.totalTokens}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-[9px] text-gray-600 uppercase">Energy (uJ)</div>
+                        <div className="text-xl font-black text-gray-400 font-mono">{report.standard.energyUsage.toFixed(1)}</div>
+                      </div>
                     </div>
                   </div>
                 </div>
