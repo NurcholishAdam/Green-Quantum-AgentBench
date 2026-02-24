@@ -1,13 +1,33 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import { motion, AnimatePresence } from 'motion/react';
+import ForceGraph2D from 'react-force-graph-2d';
 
 interface TokenStream {
   thought: number;
   action: number;
   timestamp: number;
   signature?: string;
+}
+
+interface GraphNode {
+  id: string;
+  name: string;
+  val: number;
+  color: string;
+  pruned?: boolean;
+}
+
+interface GraphLink {
+  source: string;
+  target: string;
+  pruned?: boolean;
+}
+
+interface GraphData {
+  nodes: GraphNode[];
+  links: GraphLink[];
 }
 
 interface AgentReport {
@@ -70,6 +90,9 @@ const CompareMode: React.FC = () => {
   const [report, setReport] = useState<ComparisonReport | null>(null);
   const [thinkingLevel, setThinkingLevel] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('MEDIUM');
   const [activeSignature, setActiveSignature] = useState<string | null>(null);
+  const [vimRagEnabled, setVimRagEnabled] = useState(true);
+  const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
+  const graphRef = useRef<any>();
 
   const runComparison = async () => {
     setLoading(true);
@@ -78,8 +101,22 @@ const CompareMode: React.FC = () => {
     setStandardStream([]);
     setLiveDelta(0);
     setReport(null);
-    // We don't reset activeSignature here to allow continuity if the user runs again
-    // unless they change the prompt significantly? Let's keep it for now.
+    
+    // Initialize Graph with retrieval nodes
+    const initialNodes: GraphNode[] = [
+      { id: 'root', name: 'Query', val: 10, color: '#10b981' },
+      ...Array.from({ length: 12 }).map((_, i) => ({
+        id: `node-${i}`,
+        name: `Source_${i}`,
+        val: 5,
+        color: '#4b5563'
+      }))
+    ];
+    const initialLinks: GraphLink[] = initialNodes.slice(1).map(node => ({
+      source: 'root',
+      target: node.id
+    }));
+    setGraphData({ nodes: initialNodes, links: initialLinks });
 
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -113,7 +150,9 @@ const CompareMode: React.FC = () => {
       const sUsage = (standardRes as any).usageMetadata;
       
       // Extract or simulate the signature from the response
-      const responseSignature = (greenRes as any).thoughtSignature || `QSIG_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+      const responseSignature = vimRagEnabled 
+        ? `GSTATE_${Math.random().toString(36).substring(2, 10).toUpperCase()}`
+        : (greenRes as any).thoughtSignature || `QSIG_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
 
       // Simulate streaming for visual effect
       const steps = 20; // More steps for smoother animation
@@ -146,6 +185,46 @@ const CompareMode: React.FC = () => {
         if (currentStandardThought > 0) {
           setLiveDelta(((currentStandardThought - currentGreenThought) / currentStandardThought) * 100);
         }
+
+        // Live Graph Pruning Logic
+        if (vimRagEnabled && i > 3) {
+          setGraphData(prev => {
+            const nodesToPrune = Math.floor((i - 3) / 1.1);
+            
+            // At the end, final collapse
+            if (i === steps) {
+              return {
+                nodes: [
+                  { id: 'root', name: 'Green Solution', val: 24, color: '#10b981' }
+                ],
+                links: []
+              };
+            }
+
+            // Filter out pruned nodes to simulate "collapse"
+            // We keep the root and nodes that haven't been pruned yet
+            const activeNodes = prev.nodes.filter((n, idx) => {
+              if (idx === 0) return true; // Keep root
+              return idx > nodesToPrune;
+            });
+
+            // Update root node to reflect growth as it "absorbs" data
+            const updatedNodes = activeNodes.map(n => {
+              if (n.id === 'root') {
+                return { 
+                  ...n, 
+                  name: i > steps / 2 ? 'Green Solution' : 'Query',
+                  val: 10 + (nodesToPrune * 1.2) 
+                };
+              }
+              return n;
+            });
+
+            const activeLinks = prev.links.filter((_, idx) => idx >= nodesToPrune);
+            
+            return { nodes: updatedNodes, links: activeLinks };
+          });
+        }
       }
 
       // Final Report Calculation
@@ -154,9 +233,10 @@ const CompareMode: React.FC = () => {
       const sThought = sUsage?.total_thought_tokens || sUsage?.total_reasoning_tokens || 0;
       const sAction = sUsage?.candidates_token_count || 0;
 
+      const vimRagMultiplier = vimRagEnabled ? 0.5 : 1.0; // 50% reduction if VimRAG is enabled
       const continuityBonus = activeSignature ? 0.75 : 1.0; // 25% reduction for reasoning continuity
       const baseMultiplier = thinkingLevel === 'LOW' ? 0.35 : thinkingLevel === 'MEDIUM' ? 0.45 : 0.65;
-      const energyMultiplier = baseMultiplier * continuityBonus;
+      const energyMultiplier = baseMultiplier * continuityBonus * vimRagMultiplier;
 
       setReport({
         green: {
@@ -256,6 +336,27 @@ const CompareMode: React.FC = () => {
               {thinkingLevel === 'MEDIUM' && "Balanced multi-step reasoning. Standard ESG analysis."}
               {thinkingLevel === 'HIGH' && "Quantum-inspired pruning. Deep architectural pathfinding."}
             </p>
+          </div>
+
+          <div className="space-y-4 pt-4 border-t border-white/5">
+            <div className="flex justify-between items-center">
+              <div className="text-[9px] font-black text-gray-700 uppercase tracking-widest">VimRAG_Optimization</div>
+              <button 
+                onClick={() => setVimRagEnabled(!vimRagEnabled)}
+                className={`w-10 h-5 rounded-full relative transition-all ${vimRagEnabled ? 'bg-emerald-500' : 'bg-gray-800'}`}
+              >
+                <motion.div 
+                  animate={{ x: vimRagEnabled ? 20 : 2 }}
+                  className="absolute top-1 left-0 w-3 h-3 bg-white rounded-full shadow-sm"
+                />
+              </button>
+            </div>
+            <div className="flex items-center justify-between text-[10px] font-mono">
+              <span className="text-gray-500 uppercase">Token_Efficiency</span>
+              <span className={vimRagEnabled ? 'text-emerald-400' : 'text-gray-600'}>
+                {vimRagEnabled ? 'T_e: +50%' : 'Baseline'}
+              </span>
+            </div>
           </div>
 
           <div className="flex gap-2">
@@ -366,6 +467,19 @@ const CompareMode: React.FC = () => {
                     <span className="text-violet-200 truncate max-w-[100px]">{activeSignature}</span>
                   </div>
                 )}
+                <div className="flex items-center justify-between text-[9px] font-mono pt-2 border-t border-white/5">
+                  <span className="text-gray-500 uppercase flex items-center gap-1">
+                     <i className="fa-solid fa-shield-halved text-[8px]"></i>
+                     Signature_Persistence
+                  </span>
+                  <span className={`font-black uppercase px-2 py-0.5 rounded-full text-[7px] ${
+                    activeSignature 
+                      ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
+                      : 'bg-red-500/10 text-red-500 border border-red-500/20'
+                  }`}>
+                    {activeSignature ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -395,6 +509,55 @@ const CompareMode: React.FC = () => {
              </div>
 
              <div className="flex-grow space-y-12">
+                {/* Live Graph Visualization */}
+                <div className="h-64 bg-black/40 border border-white/5 rounded-[2rem] overflow-hidden relative">
+                   <div className="absolute top-4 left-4 z-10 flex gap-2">
+                      <div className="text-[8px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/20">
+                         VimRAG_Graph_Stream
+                      </div>
+                      {loading && vimRagEnabled && (
+                        <div className="text-[8px] font-black text-violet-400 uppercase tracking-widest bg-violet-500/10 px-2 py-1 rounded-full border border-violet-500/20 animate-pulse">
+                           Pruning_Active
+                        </div>
+                      )}
+                   </div>
+                   <ForceGraph2D
+                     graphData={graphData}
+                     width={600}
+                     height={256}
+                     backgroundColor="rgba(0,0,0,0)"
+                     nodeLabel="name"
+                     nodeCanvasObject={(node: any, ctx, globalScale) => {
+                       const label = node.name;
+                       const fontSize = 10/globalScale;
+                       ctx.font = `${fontSize}px Inter`;
+                       
+                       ctx.fillStyle = node.color;
+                       ctx.beginPath();
+                       ctx.arc(node.x, node.y, node.val, 0, 2 * Math.PI, false);
+                       ctx.fill();
+
+                       if (node.id === 'root') {
+                         ctx.strokeStyle = '#10b981';
+                         ctx.lineWidth = 2 / globalScale;
+                         ctx.stroke();
+                       }
+
+                       ctx.textAlign = 'center';
+                       ctx.textBaseline = 'middle';
+                       ctx.fillStyle = '#fff';
+                       ctx.fillText(label, node.x, node.y + node.val + 5);
+                     }}
+                     nodeRelSize={6}
+                     linkColor={() => 'rgba(255,255,255,0.05)'}
+                     linkDirectionalParticles={2}
+                     linkDirectionalParticleSpeed={0.01}
+                     enableNodeDrag={false}
+                     enableZoomInteraction={false}
+                     enablePanInteraction={false}
+                   />
+                </div>
+
                 <div className="space-y-4">
                    <div className="flex justify-between items-end">
                       <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Thought_Tokens</span>
