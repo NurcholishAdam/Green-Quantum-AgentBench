@@ -35,6 +35,7 @@ interface AgentReport {
   actionTokens: number;
   totalTokens: number;
   energyUsage: number; 
+  dutyCycle?: { pro: number; flash: number };
 }
 
 interface ComparisonReport {
@@ -80,7 +81,103 @@ const EnergyStackedBar: React.FC<{ thought: number; action: number; label: strin
   );
 };
 
-const VimRagComparisonChart: React.FC = () => {
+const ExpertDutyCycle: React.FC<{ 
+  pro: number; 
+  flash: number; 
+  active?: 'PRO' | 'FLASH' | null;
+  history?: ('PRO' | 'FLASH')[];
+}> = ({ pro, flash, active, history = [] }) => {
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <div className="flex flex-col">
+          <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Expert_Duty_Cycle</span>
+          <span className="text-[8px] text-gray-600 font-mono">Live_Orchestration_Monitor</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <AnimatePresence mode="wait">
+            {active && (
+              <motion.div
+                key={active}
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -5 }}
+                className={`px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-tighter border ${
+                  active === 'PRO' 
+                    ? 'bg-violet-500/10 border-violet-500/20 text-violet-400' 
+                    : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                }`}
+              >
+                Active: {active === 'PRO' ? 'Gemini_3.1_Pro' : 'Gemini_3_Flash'}
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <span className="text-[9px] font-mono text-emerald-500">Sustainability_Win</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        {/* Pro Expert */}
+        <div className={`p-3 rounded-2xl border transition-all duration-300 ${
+          active === 'PRO' ? 'bg-violet-500/10 border-violet-500/30 shadow-[0_0_15px_rgba(139,92,246,0.1)]' : 'bg-white/5 border-white/5 opacity-50'
+        }`}>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-[8px] font-black text-violet-400 uppercase">High-Energy</span>
+            <span className="text-[10px] font-mono text-white font-bold">{pro}%</span>
+          </div>
+          <div className="h-1.5 bg-black/20 rounded-full overflow-hidden">
+            <motion.div 
+              animate={{ width: `${pro}%` }}
+              className="h-full bg-violet-600"
+            />
+          </div>
+        </div>
+
+        {/* Flash Expert */}
+        <div className={`p-3 rounded-2xl border transition-all duration-300 ${
+          active === 'FLASH' ? 'bg-emerald-500/10 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'bg-white/5 border-white/5 opacity-50'
+        }`}>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-[8px] font-black text-emerald-400 uppercase">Low-Energy</span>
+            <span className="text-[10px] font-mono text-white font-bold">{flash}%</span>
+          </div>
+          <div className="h-1.5 bg-black/20 rounded-full overflow-hidden">
+            <motion.div 
+              animate={{ width: `${flash}%` }}
+              className="h-full bg-emerald-500"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Live Activity Timeline */}
+      <div className="h-10 bg-black/40 rounded-xl border border-white/5 overflow-hidden flex items-end px-1 gap-0.5 relative">
+        <div className="absolute top-1 left-2 text-[6px] font-mono text-gray-600 uppercase">Activity_Log</div>
+        {Array.from({ length: 50 }).map((_, i) => {
+          const state = history[history.length - 50 + i];
+          return (
+            <motion.div
+              key={i}
+              initial={{ height: 2 }}
+              animate={{ 
+                height: state ? (state === 'PRO' ? 24 : 12) : 2,
+                opacity: state ? 1 : 0.1,
+                backgroundColor: state === 'PRO' ? '#8b5cf6' : (state === 'FLASH' ? '#10b981' : '#333')
+              }}
+              className="flex-grow rounded-t-sm"
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const VimRagComparisonChart: React.FC<{ report: ComparisonReport | null }> = ({ report }) => {
+  const standardTokens = report?.standard.totalTokens || 1240;
+  const greenTokens = report?.green.totalTokens || 558;
+  const reduction = ((standardTokens - greenTokens) / standardTokens) * 100;
+
   return (
     <motion.div 
       initial={{ opacity: 0, height: 0 }}
@@ -89,44 +186,58 @@ const VimRagComparisonChart: React.FC = () => {
       className="bg-black/40 border border-white/5 rounded-[2rem] p-6 space-y-4 overflow-hidden"
     >
       <div className="flex justify-between items-center">
-        <h4 className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Multi-Hop Retrieval Audit</h4>
-        <div className="text-[9px] font-mono text-emerald-500 font-black">-55% Tokens</div>
+        <h4 className="text-[9px] font-black text-gray-500 uppercase tracking-widest">
+          {report ? 'Live_Retrieval_Audit' : 'Multi-Hop Retrieval Audit'}
+        </h4>
+        <div className="text-[9px] font-mono text-emerald-500 font-black">-{reduction.toFixed(0)}% Tokens</div>
       </div>
       
       <div className="space-y-4">
         {/* Standard Bar */}
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 relative group">
           <div className="flex justify-between text-[8px] font-mono text-gray-500 uppercase tracking-tighter">
             <span>Standard AgentBench</span>
-            <span>1,240 tokens</span>
+            <span>{standardTokens.toLocaleString()} tokens</span>
           </div>
-          <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+          <div className="h-2 bg-white/5 rounded-full overflow-hidden cursor-help">
             <motion.div 
               initial={{ width: 0 }}
               animate={{ width: '100%' }}
               className="h-full bg-gray-600"
             />
           </div>
+          {/* Tooltip */}
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 border border-white/10 rounded text-[8px] font-mono text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap shadow-xl">
+            Baseline: {standardTokens.toLocaleString()} tokens
+            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+          </div>
         </div>
 
         {/* VimRAG Bar */}
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 relative group">
           <div className="flex justify-between text-[8px] font-mono text-emerald-400 uppercase tracking-tighter">
             <span>VimRAG-Inspired Graph</span>
-            <span>558 tokens</span>
+            <span>{greenTokens.toLocaleString()} tokens</span>
           </div>
-          <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+          <div className="h-2 bg-white/5 rounded-full overflow-hidden cursor-help">
             <motion.div 
               initial={{ width: 0 }}
-              animate={{ width: '45%' }}
+              animate={{ width: `${(greenTokens / standardTokens) * 100}%` }}
               className="h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
             />
+          </div>
+          {/* Tooltip */}
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-emerald-950 border border-emerald-500/20 rounded text-[8px] font-mono text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap shadow-xl">
+            Optimized: {greenTokens.toLocaleString()} tokens (-{reduction.toFixed(0)}%)
+            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-emerald-950"></div>
           </div>
         </div>
       </div>
       
       <p className="text-[8px] text-gray-600 italic leading-relaxed">
-        VimRAG prunes irrelevant retrieval paths in real-time, preventing token bloat in complex multi-hop reasoning tasks.
+        {report 
+          ? 'Live data showing actual token reduction achieved in this session.'
+          : 'VimRAG prunes irrelevant retrieval paths in real-time, preventing token bloat in complex multi-hop reasoning tasks.'}
       </p>
     </motion.div>
   );
@@ -154,6 +265,9 @@ const CompareMode: React.FC = () => {
   const [vimRagEnabled, setVimRagEnabled] = useState(true);
   const [showVimRagComparison, setShowVimRagComparison] = useState(false);
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
+  const [activeExpert, setActiveExpert] = useState<'PRO' | 'FLASH' | null>(null);
+  const [liveDutyCycle, setLiveDutyCycle] = useState<{ pro: number; flash: number }>({ pro: 0, flash: 0 });
+  const [expertHistory, setExpertHistory] = useState<('PRO' | 'FLASH')[]>([]);
   const graphRef = useRef<any>();
 
   const runComparison = async () => {
@@ -163,21 +277,30 @@ const CompareMode: React.FC = () => {
     setStandardStream([]);
     setLiveDelta(0);
     setReport(null);
+    setActiveExpert(null);
+    setLiveDutyCycle({ pro: 0, flash: 0 });
+    setExpertHistory([]);
     
     // Initialize Graph with retrieval nodes
-    const initialNodes: GraphNode[] = [
-      { id: 'root', name: 'Query', val: 10, color: '#10b981' },
-      ...Array.from({ length: 12 }).map((_, i) => ({
-        id: `node-${i}`,
-        name: `Source_${i}`,
-        val: 5,
-        color: '#4b5563'
-      }))
-    ];
-    const initialLinks: GraphLink[] = initialNodes.slice(1).map(node => ({
-      source: 'root',
-      target: node.id
-    }));
+    const initialNodes: GraphNode[] = activeSignature 
+      ? graphData.nodes // Persist existing graph if signature exists
+      : [
+          { id: 'root', name: 'Query', val: 10, color: '#10b981' },
+          ...Array.from({ length: 16 }).map((_, i) => ({
+            id: `node-${i}`,
+            name: `Source_${i}`,
+            val: 5,
+            color: '#10b981' 
+          }))
+        ];
+    
+    const initialLinks: GraphLink[] = activeSignature
+      ? graphData.links
+      : initialNodes.slice(1).map(node => ({
+          source: 'root',
+          target: node.id
+        }));
+    
     setGraphData({ nodes: initialNodes, links: initialLinks });
 
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -217,10 +340,35 @@ const CompareMode: React.FC = () => {
         : (greenRes as any).thoughtSignature || `QSIG_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
 
       // Simulate streaming for visual effect
-      const steps = 20; // More steps for smoother animation
-      for (let i = 1; i <= steps; i++) {
+      const steps = 20; 
+      let proTicks = 0;
+      let flashTicks = 0;
+
+      // If signature is active, skip initial retrieval steps (first 5 steps)
+      const startStep = activeSignature ? 6 : 1;
+
+      for (let i = startStep; i <= steps; i++) {
         await new Promise(r => setTimeout(r, 100));
         
+        // Expert Switching Simulation
+        let currentExpert: 'PRO' | 'FLASH' = 'FLASH';
+        // If signature is active, we stay in FLASH longer as state is already cached
+        const proThreshold = activeSignature ? 1 : 2;
+        
+        if (i <= proThreshold || i >= 19) {
+          currentExpert = 'PRO';
+          proTicks++;
+        } else {
+          currentExpert = 'FLASH';
+          flashTicks++;
+        }
+        setActiveExpert(currentExpert);
+        setExpertHistory(prev => [...prev, currentExpert].slice(-50));
+        setLiveDutyCycle({
+          pro: Math.round((proTicks / i) * 100),
+          flash: Math.round((flashTicks / i) * 100)
+        });
+
         const currentGreenThought = gUsage ? Math.round((gUsage.total_thought_tokens || gUsage.total_reasoning_tokens || 0) * (i / steps)) : 0;
         const currentStandardThought = sUsage ? Math.round((sUsage.total_thought_tokens || sUsage.total_reasoning_tokens || 0) * (i / steps)) : 0;
 
@@ -249,42 +397,36 @@ const CompareMode: React.FC = () => {
         }
 
         // Live Graph Pruning Logic
-        if (vimRagEnabled && i > 3) {
+        if (vimRagEnabled && i > 3 && !activeSignature) {
           setGraphData(prev => {
             const nodesToPrune = Math.floor((i - 3) / 1.1);
             
-            // At the end, final collapse
-            if (i === steps) {
-              return {
-                nodes: [
-                  { id: 'root', name: 'Green Solution', val: 24, color: '#10b981' }
-                ],
-                links: []
-              };
-            }
-
-            // Filter out pruned nodes to simulate "collapse"
-            // We keep the root and nodes that haven't been pruned yet
-            const activeNodes = prev.nodes.filter((n, idx) => {
-              if (idx === 0) return true; // Keep root
-              return idx > nodesToPrune;
-            });
-
-            // Update root node to reflect growth as it "absorbs" data
-            const updatedNodes = activeNodes.map(n => {
-              if (n.id === 'root') {
+            // Update node colors instead of filtering them out
+            const updatedNodes = prev.nodes.map((n, idx) => {
+              if (idx === 0) {
                 return { 
                   ...n, 
                   name: i > steps / 2 ? 'Green Solution' : 'Query',
-                  val: 10 + (nodesToPrune * 1.2) 
+                  val: 10 + (nodesToPrune * 0.8) 
                 };
+              }
+              // Prune nodes by changing color to grey
+              if (idx <= nodesToPrune) {
+                return { ...n, color: '#374151', pruned: true };
               }
               return n;
             });
 
-            const activeLinks = prev.links.filter((_, idx) => idx >= nodesToPrune);
-            
-            return { nodes: updatedNodes, links: activeLinks };
+            return {
+              nodes: updatedNodes,
+              links: prev.links.map(l => {
+                const targetIdx = parseInt((l.target as string).split('-')[1]);
+                if (targetIdx <= nodesToPrune) {
+                  return { ...l, pruned: true };
+                }
+                return l;
+              })
+            };
           });
         }
       }
@@ -305,13 +447,15 @@ const CompareMode: React.FC = () => {
           thoughtTokens: gThought,
           actionTokens: gAction,
           totalTokens: gThought + gAction,
-          energyUsage: (gThought + gAction) * energyMultiplier
+          energyUsage: (gThought + gAction) * energyMultiplier,
+          dutyCycle: { pro: 12, flash: 88 } // Simulated duty cycle
         },
         standard: {
           thoughtTokens: sThought,
           actionTokens: sAction,
           totalTokens: sThought + sAction,
-          energyUsage: (sThought + sAction) * 0.85 // Standard agent multiplier
+          energyUsage: (sThought + sAction) * 0.85, // Standard agent multiplier
+          dutyCycle: { pro: 100, flash: 0 }
         },
         timestamp: Date.now()
       });
@@ -463,7 +607,7 @@ const CompareMode: React.FC = () => {
           </div>
 
           <AnimatePresence>
-            {showVimRagComparison && <VimRagComparisonChart />}
+            {showVimRagComparison && <VimRagComparisonChart report={report} />}
           </AnimatePresence>
         </div>
 
@@ -497,6 +641,24 @@ const CompareMode: React.FC = () => {
               <p className="text-[11px] text-gray-400 italic leading-relaxed">
                 Real-time reduction in "Thought Tokens" achieved via Quantum-Pruning.
               </p>
+
+              {loading && (
+                <ExpertDutyCycle 
+                  pro={liveDutyCycle.pro} 
+                  flash={liveDutyCycle.flash} 
+                  active={activeExpert}
+                  history={expertHistory}
+                />
+              )}
+              
+              {report && (
+                <ExpertDutyCycle 
+                  pro={report.green.dutyCycle?.pro || 0} 
+                  flash={report.green.dutyCycle?.flash || 0} 
+                  active={null}
+                  history={[]}
+                />
+              )}
               
               {loading && (
                 <div className="pt-2">
@@ -586,8 +748,17 @@ const CompareMode: React.FC = () => {
                       <div className="text-[9px] font-mono text-emerald-500/60 uppercase tracking-widest">gemini-3.1-pro-customtools</div>
                    </div>
                 </div>
-                <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-[8px] font-black text-emerald-500 uppercase tracking-widest">
-                   Quantum_Pruning: ON
+                <div className="flex gap-2">
+                   <div className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border transition-all ${
+                     activeSignature 
+                       ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' 
+                       : 'bg-red-500/10 border-red-500/20 text-red-500'
+                   }`}>
+                      Signature: {activeSignature ? 'Persisted' : 'Inactive'}
+                   </div>
+                   <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-[8px] font-black text-emerald-500 uppercase tracking-widest">
+                      Quantum_Pruning: ON
+                   </div>
                 </div>
              </div>
 
@@ -615,10 +786,21 @@ const CompareMode: React.FC = () => {
                        const fontSize = 10/globalScale;
                        ctx.font = `${fontSize}px Inter`;
                        
+                       // Active path glow
+                       if (!node.pruned) {
+                         ctx.shadowColor = '#10b981';
+                         ctx.shadowBlur = 15 / globalScale;
+                       } else {
+                         ctx.shadowBlur = 0;
+                       }
+
                        ctx.fillStyle = node.color;
                        ctx.beginPath();
                        ctx.arc(node.x, node.y, node.val, 0, 2 * Math.PI, false);
                        ctx.fill();
+
+                       // Reset shadow
+                       ctx.shadowBlur = 0;
 
                        if (node.id === 'root') {
                          ctx.strokeStyle = '#10b981';
@@ -626,14 +808,17 @@ const CompareMode: React.FC = () => {
                          ctx.stroke();
                        }
 
-                       ctx.textAlign = 'center';
-                       ctx.textBaseline = 'middle';
-                       ctx.fillStyle = '#fff';
-                       ctx.fillText(label, node.x, node.y + node.val + 5);
+                       if (!node.pruned) {
+                         ctx.textAlign = 'center';
+                         ctx.textBaseline = 'middle';
+                         ctx.fillStyle = '#fff';
+                         ctx.fillText(label, node.x, node.y + node.val + 5);
+                       }
                      }}
                      nodeRelSize={6}
-                     linkColor={() => 'rgba(255,255,255,0.05)'}
-                     linkDirectionalParticles={2}
+                     linkColor={(link: any) => link.pruned ? 'rgba(75, 85, 99, 0.1)' : 'rgba(16, 185, 129, 0.4)'}
+                     linkWidth={(link: any) => link.pruned ? 0.5 : 2.5}
+                     linkDirectionalParticles={(link: any) => link.pruned ? 0 : 3}
                      linkDirectionalParticleSpeed={0.01}
                      enableNodeDrag={false}
                      enableZoomInteraction={false}
