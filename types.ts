@@ -74,12 +74,14 @@ export interface GraphNode {
   label: string;
   type: 'quantum' | 'agent' | 'error' | 'provenance' | 'policy' | 'hardware';
   val: number;
+  pruned?: boolean;
 }
 
 export interface GraphLink {
   source: string;
   target: string;
   weight: number;
+  pruned?: boolean;
 }
 
 export interface QuantumGraphData {

@@ -26,6 +26,7 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
   const [isLoadingBenchmarks, setIsLoadingBenchmarks] = useState(false);
   const [visibleTypes, setVisibleTypes] = useState<Set<string>>(new Set(['quantum', 'agent', 'error', 'provenance', 'policy', 'hardware']));
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<{
     visible: boolean;
     x: number;
@@ -456,8 +457,9 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
 
     sim.nodes(nodes);
     (sim.force("link") as d3.ForceLink<any, any>).links(links);
-
-    const connectedElements = highlightedNodeId ? getConnectedElements(highlightedNodeId) : null;
+    
+    const activeHighlightId = hoveredNodeId || highlightedNodeId;
+    const connectedElements = activeHighlightId ? getConnectedElements(activeHighlightId) : null;
 
     const linkElements = svg.select(".links")
       .selectAll("line")
@@ -468,10 +470,10 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
           .attr("stroke-opacity", 0)
           .transition().duration(800)
           .attr("stroke-opacity", (d: any) => {
-            if (highlightedNodeId) {
+            if (activeHighlightId) {
               const s = typeof d.source === 'string' ? d.source : d.source.id;
               const t = typeof d.target === 'string' ? d.target : d.target.id;
-              return (s === highlightedNodeId || t === highlightedNodeId) ? 0.8 : 0.05;
+              return (s === activeHighlightId || t === activeHighlightId) ? 0.8 : 0.05;
             }
             return Math.min(0.7, 0.15 + (d.weight / 40));
           })
@@ -481,10 +483,10 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
           .transition().duration(800)
           .attr("stroke-width", (d: any) => 1.5 + (d.weight / 8))
           .attr("stroke-opacity", (d: any) => {
-            if (highlightedNodeId) {
+            if (activeHighlightId) {
               const s = typeof d.source === 'string' ? d.source : d.source.id;
               const targetId = typeof d.target === 'string' ? d.target : d.target.id;
-              return (s === highlightedNodeId || targetId === highlightedNodeId) ? 0.8 : 0.05;
+              return (s === activeHighlightId || targetId === activeHighlightId) ? 0.8 : 0.05;
             }
             return Math.min(0.7, 0.15 + (d.weight / 40));
           })
@@ -500,8 +502,11 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
       .on("mouseout", () => {
         hideTooltip();
       })
-      .attr("stroke", (d: any) => d.weight > 20 ? "#10b981" : d.weight > 10 ? "#3b82f6" : "#444")
-      .attr("stroke-dasharray", (d: any) => d.weight < 8 ? "6,4" : "none")
+      .attr("stroke", (d: any) => {
+        if (d.pruned) return "#374151"; // Grey for pruned branches
+        return d.weight > 20 ? "#10b981" : d.weight > 10 ? "#3b82f6" : "#444";
+      })
+      .attr("stroke-dasharray", (d: any) => d.pruned ? "2,2" : (d.weight < 8 ? "6,4" : "none"))
       .attr("cursor", "help");
 
     const nodeElements = svg.select(".nodes")
@@ -529,8 +534,8 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
           .transition().duration(1000)
           .attr("r", (d: any) => 14 + (d.val / 7))
           .attr("opacity", (d: any) => {
-            if (highlightedNodeId) {
-              return (d.id === highlightedNodeId || connectedElements?.connectedNodeIds.has(d.id)) ? 1 : 0.1;
+            if (activeHighlightId) {
+              return (d.id === activeHighlightId || connectedElements?.connectedNodeIds.has(d.id)) ? 1 : 0.1;
             }
             return 1;
           })
@@ -539,8 +544,8 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
           .transition().duration(1000)
           .attr("r", (d: any) => 14 + (d.val / 7))
           .attr("opacity", (d: any) => {
-            if (highlightedNodeId) {
-              return (d.id === highlightedNodeId || connectedElements?.connectedNodeIds.has(d.id)) ? 1 : 0.1;
+            if (activeHighlightId) {
+              return (d.id === activeHighlightId || connectedElements?.connectedNodeIds.has(d.id)) ? 1 : 0.1;
             }
             return 1;
           })
@@ -548,12 +553,14 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
         exit => exit.transition().duration(500).attr("r", 0).remove()
       )
       .on("mouseover", (event, d: any) => {
+        setHoveredNodeId(d.id);
         showTooltip(event, d, 'node');
       })
       .on("mousemove", (event) => {
         setTooltip(prev => prev ? { ...prev, x: event.clientX, y: event.clientY } : null);
       })
       .on("mouseout", () => {
+        setHoveredNodeId(null);
         hideTooltip();
       })
       .on("click", (event, d: any) => {
@@ -561,8 +568,18 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
           handleAgentClick(d.id);
         }
       })
-      .attr("fill", (d: any) => QUANTUM_COLORS[d.type as keyof typeof QUANTUM_COLORS])
-      .attr("filter", (d: any) => d.val > 75 ? `url(#glow-${d.type})` : "none")
+      .attr("fill", (d: any) => {
+        if (d.pruned) {
+          return d.id === hoveredNodeId ? "#6b7280" : "#374151"; // Lighter grey on hover
+        }
+        return QUANTUM_COLORS[d.type as keyof typeof QUANTUM_COLORS];
+      })
+      .attr("stroke", (d: any) => {
+        if (d.pruned && d.id === hoveredNodeId) return "#9ca3af"; // Add stroke to pruned node on hover
+        return "#fff";
+      })
+      .attr("stroke-width", (d: any) => (d.pruned && d.id === hoveredNodeId) ? 2.5 : 1.5)
+      .attr("filter", (d: any) => (d.val > 75 && !d.pruned) ? `url(#glow-${d.type})` : "none")
       .attr("cursor", "pointer");
 
     sim.on("tick", () => {
@@ -578,7 +595,7 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
     });
 
     sim.alpha(0.15).restart();
-  }, [graphData, visibleTypes, viewMode, selectedAgentId, highlightedNodeId, getConnectedElements, handleAgentClick, showTooltip, hideTooltip]);
+  }, [graphData, visibleTypes, viewMode, selectedAgentId, highlightedNodeId, hoveredNodeId, getConnectedElements, handleAgentClick, showTooltip, hideTooltip]);
 
   const fullNodes = graphData?.nodes || [];
   const activeNodes = fullNodes.filter(n => visibleTypes.has(n.type));

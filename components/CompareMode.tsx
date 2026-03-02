@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import { motion, AnimatePresence, useSpring, useTransform } from 'motion/react';
 import ForceGraph2D from 'react-force-graph-2d';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 
 interface TokenStream {
   thought: number;
@@ -36,6 +37,7 @@ interface AgentReport {
   totalTokens: number;
   energyUsage: number; 
   dutyCycle?: { pro: number; flash: number };
+  sustainabilityScore: number;
 }
 
 interface ComparisonReport {
@@ -87,6 +89,11 @@ const ExpertDutyCycle: React.FC<{
   active?: 'PRO' | 'FLASH' | null;
   history?: ('PRO' | 'FLASH')[];
 }> = ({ pro, flash, active, history = [] }) => {
+  const data = [
+    { name: 'High-Energy (Pro)', value: pro, color: '#8b5cf6' },
+    { name: 'Low-Energy (Flash)', value: flash, color: '#10b981' }
+  ];
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -116,36 +123,57 @@ const ExpertDutyCycle: React.FC<{
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        {/* Pro Expert */}
-        <div className={`p-3 rounded-2xl border transition-all duration-300 ${
-          active === 'PRO' ? 'bg-violet-500/10 border-violet-500/30 shadow-[0_0_15px_rgba(139,92,246,0.1)]' : 'bg-white/5 border-white/5 opacity-50'
-        }`}>
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-[8px] font-black text-violet-400 uppercase">High-Energy</span>
-            <span className="text-[10px] font-mono text-white font-bold">{pro}%</span>
-          </div>
-          <div className="h-1.5 bg-black/20 rounded-full overflow-hidden">
-            <motion.div 
-              animate={{ width: `${pro}%` }}
-              className="h-full bg-violet-600"
-            />
-          </div>
+      <div className="flex items-center gap-6 bg-black/20 p-4 rounded-3xl border border-white/5">
+        <div className="w-24 h-24 shrink-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={data}
+                cx="50%"
+                cy="50%"
+                innerRadius={30}
+                outerRadius={45}
+                paddingAngle={5}
+                dataKey="value"
+                stroke="none"
+              >
+                {data.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} opacity={active === (index === 0 ? 'PRO' : 'FLASH') ? 1 : 0.4} />
+                ))}
+              </Pie>
+              <RechartsTooltip 
+                contentStyle={{ backgroundColor: '#000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '10px' }}
+                itemStyle={{ color: '#fff' }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
         </div>
 
-        {/* Flash Expert */}
-        <div className={`p-3 rounded-2xl border transition-all duration-300 ${
-          active === 'FLASH' ? 'bg-emerald-500/10 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'bg-white/5 border-white/5 opacity-50'
-        }`}>
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-[8px] font-black text-emerald-400 uppercase">Low-Energy</span>
-            <span className="text-[10px] font-mono text-white font-bold">{flash}%</span>
+        <div className="flex-grow grid grid-cols-1 gap-3">
+          {/* Pro Expert */}
+          <div className={`p-2 rounded-xl border transition-all duration-300 ${
+            active === 'PRO' ? 'bg-violet-500/10 border-violet-500/30' : 'bg-white/5 border-white/5 opacity-50'
+          }`}>
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-violet-600"></div>
+                <span className="text-[8px] font-black text-violet-400 uppercase">Pro</span>
+              </div>
+              <span className="text-[10px] font-mono text-white font-bold">{pro}%</span>
+            </div>
           </div>
-          <div className="h-1.5 bg-black/20 rounded-full overflow-hidden">
-            <motion.div 
-              animate={{ width: `${flash}%` }}
-              className="h-full bg-emerald-500"
-            />
+
+          {/* Flash Expert */}
+          <div className={`p-2 rounded-xl border transition-all duration-300 ${
+            active === 'FLASH' ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/5 border-white/5 opacity-50'
+          }`}>
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                <span className="text-[8px] font-black text-emerald-400 uppercase">Flash</span>
+              </div>
+              <span className="text-[10px] font-mono text-white font-bold">{flash}%</span>
+            </div>
           </div>
         </div>
       </div>
@@ -335,9 +363,9 @@ const CompareMode: React.FC = () => {
       const sUsage = (standardRes as any).usageMetadata;
       
       // Extract or simulate the signature from the response
-      const responseSignature = vimRagEnabled 
+      const responseSignature = (greenRes as any).thoughtSignature || (vimRagEnabled 
         ? `GSTATE_${Math.random().toString(36).substring(2, 10).toUpperCase()}`
-        : (greenRes as any).thoughtSignature || `QSIG_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+        : `QSIG_${Math.random().toString(36).substring(2, 10).toUpperCase()}`);
 
       // Simulate streaming for visual effect
       const steps = 20; 
@@ -442,20 +470,29 @@ const CompareMode: React.FC = () => {
       const baseMultiplier = thinkingLevel === 'LOW' ? 0.35 : thinkingLevel === 'MEDIUM' ? 0.45 : 0.65;
       const energyMultiplier = baseMultiplier * continuityBonus * vimRagMultiplier;
 
+      const gDuty = { pro: 12, flash: 88 };
+      const sDuty = { pro: 100, flash: 0 };
+      
+      const gSavings = sThought > 0 ? (sThought - gThought) / sThought : 0;
+      const gScore = Math.round((gDuty.flash * 0.6) + (gSavings * 100 * 0.4));
+      const sScore = Math.round((sDuty.flash * 0.6) + (0 * 0.4));
+
       setReport({
         green: {
           thoughtTokens: gThought,
           actionTokens: gAction,
           totalTokens: gThought + gAction,
           energyUsage: (gThought + gAction) * energyMultiplier,
-          dutyCycle: { pro: 12, flash: 88 } // Simulated duty cycle
+          dutyCycle: gDuty,
+          sustainabilityScore: gScore
         },
         standard: {
           thoughtTokens: sThought,
           actionTokens: sAction,
           totalTokens: sThought + sAction,
-          energyUsage: (sThought + sAction) * 0.85, // Standard agent multiplier
-          dutyCycle: { pro: 100, flash: 0 }
+          energyUsage: (sThought + sAction) * 0.85, 
+          dutyCycle: sDuty,
+          sustainabilityScore: sScore
         },
         timestamp: Date.now()
       });
@@ -709,7 +746,7 @@ const CompareMode: React.FC = () => {
                        <i className="fa-solid fa-fingerprint text-[8px]"></i>
                        Thought_Sig
                     </span>
-                    <span className="text-violet-200 truncate max-w-[100px]">{activeSignature}</span>
+                    <span className="text-violet-200 truncate max-w-[140px]">{activeSignature}</span>
                   </div>
                 )}
                 <div className="flex items-center justify-between text-[9px] font-mono pt-2 border-t border-white/5">
@@ -754,7 +791,7 @@ const CompareMode: React.FC = () => {
                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' 
                        : 'bg-red-500/10 border-red-500/20 text-red-500'
                    }`}>
-                      Signature: {activeSignature ? 'Persisted' : 'Inactive'}
+                      Sig: {activeSignature || 'Inactive'}
                    </div>
                    <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-[8px] font-black text-emerald-500 uppercase tracking-widest">
                       Quantum_Pruning: ON
@@ -960,6 +997,38 @@ const CompareMode: React.FC = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
                 <div className="space-y-6">
+                  <div className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Sustainability_Score</div>
+                  <div className="space-y-6">
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 p-6 rounded-3xl space-y-2">
+                       <div className="flex justify-between items-center">
+                          <span className="text-[10px] text-emerald-400 font-black uppercase">Green Agent</span>
+                          <span className="text-2xl font-black text-white font-mono">{report.green.sustainabilityScore}</span>
+                       </div>
+                       <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${report.green.sustainabilityScore}%` }}
+                            className="h-full bg-emerald-500"
+                          />
+                       </div>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 p-6 rounded-3xl space-y-2 opacity-60">
+                       <div className="flex justify-between items-center">
+                          <span className="text-[10px] text-gray-400 font-black uppercase">Standard Agent</span>
+                          <span className="text-2xl font-black text-white font-mono">{report.standard.sustainabilityScore}</span>
+                       </div>
+                       <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${report.standard.sustainabilityScore}%` }}
+                            className="h-full bg-gray-500"
+                          />
+                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
                   <div className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Thought_Token_Delta</div>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
@@ -1047,6 +1116,17 @@ const CompareMode: React.FC = () => {
                         <div className="text-[9px] text-gray-600 uppercase">Energy (uJ)</div>
                         <div className="text-xl font-black text-emerald-500 font-mono">{report.green.energyUsage.toFixed(1)}</div>
                       </div>
+                      {activeSignature && (
+                        <div className="space-y-1 col-span-2 pt-4 border-t border-white/5">
+                          <div className="text-[9px] text-gray-600 uppercase flex items-center gap-2">
+                             <i className="fa-solid fa-fingerprint text-[8px] text-emerald-500"></i>
+                             Thought Signature
+                          </div>
+                          <div className="text-[11px] font-mono text-emerald-400 break-all bg-black/40 p-3 rounded-xl border border-emerald-500/10">
+                            {activeSignature}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 

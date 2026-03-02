@@ -253,8 +253,47 @@ export const getGraphTelemetry = async (type: string): Promise<QuantumGraphData>
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Generate a JSON quantum graph for ${type}. Nodes: agent, quantum, error, provenance.`,
-      config: { responseMimeType: "application/json" }
+      contents: `Generate a JSON quantum graph for ${type}. 
+      Nodes: agent, quantum, error, provenance, policy, hardware.
+      Each node should have: id, label, type, val (0-100), and an optional 'pruned' (boolean) property.
+      Each link should have: source, target, weight (0-50), and an optional 'pruned' (boolean) property.
+      Ensure some nodes and links are marked as pruned: true to simulate VimRAG pruning.`,
+      config: { 
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            nodes: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING },
+                  label: { type: Type.STRING },
+                  type: { type: Type.STRING, enum: ['quantum', 'agent', 'error', 'provenance', 'policy', 'hardware'] },
+                  val: { type: Type.NUMBER },
+                  pruned: { type: Type.BOOLEAN }
+                },
+                required: ["id", "label", "type", "val"]
+              }
+            },
+            links: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  source: { type: Type.STRING },
+                  target: { type: Type.STRING },
+                  weight: { type: Type.NUMBER },
+                  pruned: { type: Type.BOOLEAN }
+                },
+                required: ["source", "target", "weight"]
+              }
+            }
+          },
+          required: ["nodes", "links"]
+        }
+      }
     });
     return JSON.parse(response.text || '{"nodes":[], "links":[]}');
   } catch (error) { return { nodes: [], links: [] }; }
