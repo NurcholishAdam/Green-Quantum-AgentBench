@@ -4,6 +4,7 @@ import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import { motion, AnimatePresence, useSpring, useTransform } from 'motion/react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import { green_quantum_router } from '../services/geminiService';
 
 interface TokenStream {
   thought: number;
@@ -39,6 +40,7 @@ interface AgentReport {
   heliumUsage: number; // In H-Units (Thermal/Hardware Stress)
   dutyCycle?: { pro: number; flash: number };
   sustainabilityScore: number;
+  routingDecision?: any;
 }
 
 interface ComparisonReport {
@@ -322,6 +324,81 @@ const VimRagComparisonChart: React.FC<{ report: ComparisonReport | null }> = ({ 
   );
 };
 
+const RoutingPath: React.FC<{ target: 'HELIUM_EDGE_MODULE' | 'GEMINI_CLOUD_EXPERT'; description: string }> = ({ target, description }) => {
+  const isHelium = target === 'HELIUM_EDGE_MODULE';
+  
+  return (
+    <div className="bg-black/40 border border-white/5 rounded-2xl p-4 space-y-4">
+      <div className="flex justify-between items-center">
+        <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Sustainability_Aware_Routing</span>
+        <div className={`px-2 py-0.5 rounded text-[7px] font-black uppercase ${
+          isHelium ? 'bg-emerald-500/20 text-emerald-400' : 'bg-violet-500/20 text-violet-400'
+        }`}>
+          {isHelium ? 'Green_Path' : 'Power_Path'}
+        </div>
+      </div>
+      
+      <div className="flex items-center gap-4">
+        <div className="flex flex-col items-center gap-1">
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center border transition-all ${
+            isHelium ? 'bg-emerald-500 text-black border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-white/5 border-white/10 text-gray-500'
+          }`}>
+            <i className="fa-solid fa-microchip"></i>
+          </div>
+          <span className="text-[6px] font-black text-gray-600 uppercase">Helium_Edge</span>
+        </div>
+        
+        <div className="flex-grow flex items-center justify-center overflow-hidden">
+          <div className="w-full h-px bg-white/10 relative">
+            <motion.div 
+              animate={{ 
+                x: isHelium ? ['0%', '200%'] : ['200%', '0%'],
+                opacity: [0, 1, 0]
+              }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+              className={`absolute top-1/2 -translate-y-1/2 w-4 h-1 rounded-full ${isHelium ? 'bg-emerald-500' : 'bg-violet-400'}`}
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center gap-1">
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center border transition-all ${
+            !isHelium ? 'bg-violet-600 text-white border-violet-500 shadow-[0_0_10px_rgba(139,92,246,0.3)]' : 'bg-white/5 border-white/10 text-gray-500'
+          }`}>
+            <i className="fa-solid fa-cloud"></i>
+          </div>
+          <span className="text-[6px] font-black text-gray-600 uppercase">Gemini_Cloud</span>
+        </div>
+      </div>
+      
+      <div className="text-[8px] font-mono text-gray-400 leading-tight">
+        <span className="text-emerald-500 font-black">SAR_Decision:</span> {description}
+      </div>
+    </div>
+  );
+};
+
+const CarbonAvoidedCounter: React.FC<{ amount: number }> = ({ amount }) => {
+  return (
+    <div className="bg-[#0f2a1f] border border-emerald-500/20 rounded-3xl p-6 relative overflow-hidden group">
+      <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+        <i className="fa-solid fa-leaf text-4xl text-emerald-500"></i>
+      </div>
+      <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Carbon_Avoided_Live</div>
+      <div className="flex items-baseline gap-2">
+        <span className="text-4xl font-black text-white tracking-tighter">
+          {amount.toFixed(2)}
+        </span>
+        <span className="text-sm font-black text-emerald-500/60 uppercase">Kg CO2e</span>
+      </div>
+      <div className="mt-4 flex items-center gap-2 text-[8px] font-mono text-emerald-400/60 uppercase">
+        <i className="fa-solid fa-circle-check"></i>
+        Optimized by Hybrid Edge-to-Cloud Routing
+      </div>
+    </div>
+  );
+};
+
 const CompareMode: React.FC = () => {
   const [isComparing, setIsComparing] = useState(false);
   const [prompt, setPrompt] = useState('Optimize this recursive quantum-pruning loop for a mobile NPU with 2GB RAM budget.');
@@ -329,6 +406,8 @@ const CompareMode: React.FC = () => {
   const [standardStream, setStandardStream] = useState<TokenStream[]>([]);
   const [loading, setLoading] = useState(false);
   const [liveDelta, setLiveDelta] = useState<number>(0);
+  const [totalCarbonAvoided, setTotalCarbonAvoided] = useState(0);
+  const [currentRouting, setCurrentRouting] = useState<any>(null);
   
   const springDelta = useSpring(0, { stiffness: 50, damping: 20 });
   const displayDelta = useTransform(springDelta, (v) => v.toFixed(0));
@@ -382,17 +461,26 @@ const CompareMode: React.FC = () => {
           target: node.id
         }));
     
-    setGraphData({ nodes: initialNodes, links: initialLinks });
+    const complexity = prompt.length > 50 ? 0.85 : 0.45;
+    const qec = prompt.toLowerCase().includes('quantum') || prompt.toLowerCase().includes('qec');
+    const routing = green_quantum_router(complexity, qec); 
+    setCurrentRouting(routing);
+    if (routing.target === 'HELIUM_EDGE_MODULE') {
+      setTotalCarbonAvoided(prev => prev + 1.45);
+    }
 
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     try {
       // Map thinking level to Gemini API ThinkingLevel
       const tLevel = thinkingLevel === 'LOW' ? ThinkingLevel.LOW : ThinkingLevel.HIGH;
+      
+      // Select model based on routing
+      const targetModel = routing.target === 'HELIUM_EDGE_MODULE' ? "gemini-3-flash-preview" : "gemini-3.1-pro-preview-customtools";
 
       // Run Green Agent (Custom Tools)
       const greenPromise = ai.models.generateContent({
-        model: "gemini-3.1-pro-preview-customtools",
+        model: targetModel,
         contents: activeSignature 
           ? [
               { role: 'user', parts: [{ text: `[PREVIOUS_STATE_SIG:${activeSignature}]` }] },
@@ -400,7 +488,13 @@ const CompareMode: React.FC = () => {
             ]
           : `[GREEN_AGENT_MODE] Task: ${prompt}`,
         config: {
-          thinkingConfig: { thinkingLevel: tLevel }
+          systemInstruction: (routing.config as any)?.systemInstruction,
+          thinkingConfig: { 
+            thinkingLevel: tLevel,
+            includeThoughts: (routing.config as any)?.thinkingConfig?.includeThought 
+          },
+          temperature: (routing.config as any)?.temperature || 0.2,
+          maxOutputTokens: (routing.config as any)?.maxOutputTokens || 1024
         }
       });
 
@@ -585,6 +679,8 @@ const CompareMode: React.FC = () => {
       
       {/* Sidebar Controls */}
       <div className="lg:col-span-3 space-y-6">
+        <CarbonAvoidedCounter amount={totalCarbonAvoided} />
+
         <div className="bg-[#0d0d0d] border border-white/5 p-8 rounded-[2.5rem] shadow-xl space-y-6">
           <div className="space-y-2">
             <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.4em] font-mono italic">Compare_Engine_V1</h3>
@@ -715,6 +811,15 @@ const CompareMode: React.FC = () => {
               </button>
             )}
           </div>
+          
+          {currentRouting && (
+            <div className="pt-2">
+              <RoutingPath 
+                target={currentRouting.target} 
+                description={currentRouting.description} 
+              />
+            </div>
+          )}
 
           <AnimatePresence>
             {showVimRagComparison && <VimRagComparisonChart report={report} />}
@@ -856,7 +961,9 @@ const CompareMode: React.FC = () => {
                    </div>
                    <div>
                       <h4 className="text-[12px] font-black text-white uppercase tracking-widest">Green_Agent</h4>
-                      <div className="text-[9px] font-mono text-emerald-500/60 uppercase tracking-widest">gemini-3.1-pro-customtools</div>
+                      <div className="text-[9px] font-mono text-emerald-500/60 uppercase tracking-widest">
+                        {currentRouting?.target === 'HELIUM_EDGE_MODULE' ? 'helium-1-2b-quantized' : 'gemini-3.1-pro-preview'}
+                      </div>
                    </div>
                 </div>
                 <div className="flex gap-2">

@@ -87,4 +87,5 @@ export interface GraphLink {
 export interface QuantumGraphData {
   nodes: GraphNode[];
   links: GraphLink[];
+  thoughtSignature?: string;
 }

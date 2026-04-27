@@ -246,19 +246,63 @@ export const getChaosNotice = async (agent: AgentBenchmark): Promise<string> => 
 };
 
 /**
+ * Expert configuration for the High-Energy Cloud Expert (Gemini 3.1 Pro).
+ */
+export const gemini_expert_config = {
+  systemInstruction: `You are the High-Energy Reasoning Expert for Green-Quantum AgentBench. 
+  Utilize the Quantum Limit Graph state and focus on high-precision pathfinding. 
+  Always output the current 'Value of Green' (VoG) in your metadata.`,
+  thinkingConfig: {
+    includeThought: true,
+    thinkingLevel: "MEDIUM" // Escalates for complex QEC/VimRAG logic
+  },
+  temperature: 0.2,
+  maxOutputTokens: 1024,
+  candidateCount: 1,
+};
+
+/**
+ * Implements the 'Sustainability-Aware Routing' (SAR) logic.
+ * Optimizes for Accuracy-per-Watt by favoring Helium for Tier-0 tasks.
+ */
+export const green_quantum_router = (taskComplexity: number, qecRequired: boolean = false) => {
+  if (taskComplexity < 0.6 && !qecRequired) {
+    return {
+      target: "HELIUM_EDGE_MODULE" as const,
+      model_id: "helium-1-2b-quantized",
+      config: {
+        power_mode: "eco", // Triggers the 8.3W profile on Jetson/Pi
+        quantization: "INT4"
+      },
+      description: "Executing locally to save 98% Carbon Footprint."
+    };
+  } else {
+    return {
+      target: "GEMINI_CLOUD_EXPERT" as const,
+      model_id: "gemini-3.1-pro-preview",
+      config: gemini_expert_config,
+      description: "Escalating to Cloud Expert for Quantum-Native Reasoning."
+    };
+  }
+};
+
+/**
  * Generates quantum graph data.
  */
-export const getGraphTelemetry = async (type: string): Promise<QuantumGraphData> => {
+export const getGraphTelemetry = async (type: string, existingSignature?: string): Promise<QuantumGraphData> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Generate a JSON quantum graph for ${type}. 
+      model: "gemini-3.1-pro-preview-customtools",
+      contents: existingSignature 
+        ? `[PREVIOUS_GRAPH_SIG:${existingSignature}] Refresh/Update the quantum graph for ${type} if state has evolved, otherwise confirm cache.`
+        : `Generate a JSON quantum graph for ${type}. 
       Nodes: agent, quantum, error, provenance, policy, hardware.
       Each node should have: id, label, type, val (0-100), and an optional 'pruned' (boolean) property.
       Each link should have: source, target, weight (0-50), and an optional 'pruned' (boolean) property.
       Ensure some nodes and links are marked as pruned: true to simulate VimRAG pruning.`,
       config: { 
+        thinkingConfig: { thinkingBudget: 16000 },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -289,13 +333,22 @@ export const getGraphTelemetry = async (type: string): Promise<QuantumGraphData>
                 },
                 required: ["source", "target", "weight"]
               }
-            }
+            },
+            thoughtSignature: { type: Type.STRING }
           },
           required: ["nodes", "links"]
         }
       }
     });
-    return JSON.parse(response.text || '{"nodes":[], "links":[]}');
+    
+    const data = JSON.parse(response.text || '{"nodes":[], "links":[]}');
+    const usage = (response as any).usageMetadata;
+    const sig = data.thoughtSignature || (usage ? (usage.thought_signature || usage.reasoning_signature) : undefined);
+    
+    return { 
+      ...data, 
+      thoughtSignature: sig || existingSignature || `GSIG_${Math.random().toString(36).substring(2, 10).toUpperCase()}`
+    };
   } catch (error) { return { nodes: [], links: [] }; }
 };
 

@@ -14,6 +14,7 @@ interface Props {
 const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance', autoRefresh = true }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [graphData, setGraphData] = useState<QuantumGraphData>(initialData);
+  const [activeSignature, setActiveSignature] = useState<string | null>(initialData?.thoughtSignature || null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [viewMode, setViewMode] = useState<'graph' | 'pareto' | 'resources'>(() => {
     const saved = localStorage.getItem('quantum_graph_view_mode');
@@ -115,20 +116,26 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
   const fetchUpdate = useCallback(async () => {
     setIsSyncing(true);
     try {
-      const newData = await getGraphTelemetry(type);
+      const newData = await getGraphTelemetry(type, activeSignature || undefined);
       if (newData && newData.nodes && newData.nodes.length > 0) {
         setGraphData(newData);
+        if (newData.thoughtSignature) {
+          setActiveSignature(newData.thoughtSignature);
+        }
       }
     } catch (err) {
       console.error("Entanglement sync failed", err);
     } finally {
       setIsSyncing(false);
     }
-  }, [type]);
+  }, [type, activeSignature]);
 
   useEffect(() => {
     if (initialData) {
       setGraphData(initialData);
+      if (initialData.thoughtSignature) {
+        setActiveSignature(initialData.thoughtSignature);
+      }
     }
   }, [initialData]);
 
@@ -750,6 +757,16 @@ const QuantumGraph: React.FC<Props> = ({ data: initialData, type = 'provenance',
            viewMode === 'pareto' ? 'Visualizing Efficiency vs Accuracy Trade-offs' :
            'Auditing CPU, Memory, and Energy Load Profiles'}
         </p>
+        
+        {activeSignature && viewMode === 'graph' && (
+          <div className="pl-7 pt-2 flex items-center gap-2">
+            <div className="px-2 py-0.5 bg-violet-500/10 border border-violet-500/20 rounded-md text-[7px] font-mono text-violet-400 uppercase flex items-center gap-1.5 shadow-[0_0_10px_rgba(139,92,246,0.1)]">
+              <i className="fa-solid fa-fingerprint text-[8px]"></i>
+              <span className="opacity-60 text-[6px]">Modulated_Sig:</span>
+              <span className="font-black tracking-tight">{activeSignature}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="absolute top-10 right-12 z-10 flex items-center gap-2 bg-black/40 backdrop-blur-md p-1.5 rounded-2xl border border-white/5">
