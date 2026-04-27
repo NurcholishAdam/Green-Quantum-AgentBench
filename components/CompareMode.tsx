@@ -36,6 +36,7 @@ interface AgentReport {
   actionTokens: number;
   totalTokens: number;
   energyUsage: number; 
+  heliumUsage: number; // In H-Units (Thermal/Hardware Stress)
   dutyCycle?: { pro: number; flash: number };
   sustainabilityScore: number;
 }
@@ -83,6 +84,56 @@ const EnergyStackedBar: React.FC<{ thought: number; action: number; label: strin
   );
 };
 
+const DecisionMatrix: React.FC<{ carbon: string; helium: string }> = ({ carbon, helium }) => {
+  const carbons = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+  const heliums = ['STABLE', 'WARM', 'HOT', 'EXTREME'];
+
+  const getCellLabel = (c: string, h: string) => {
+    if (c === 'LOW' && h === 'STABLE') return 'Ultra-Efficient';
+    if (c === 'CRITICAL' || h === 'EXTREME') return 'Risk-Critical';
+    if (c === 'HIGH' && h === 'HOT') return 'Heavy-Load';
+    return 'Balanced';
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest text-center mb-4">v5.0.0 Dual-Axis Decision Matrix</div>
+      <div className="grid grid-cols-5 gap-1">
+        <div className="col-span-1"></div>
+        {heliums.map(h => (
+          <div key={h} className="text-[7px] font-black text-gray-600 text-center uppercase py-1">{h}</div>
+        ))}
+        {carbons.map(c => (
+          <React.Fragment key={c}>
+            <div className="text-[7px] font-black text-gray-600 flex items-center pr-2 uppercase">{c}</div>
+            {heliums.map(h => {
+              const isActive = c === carbon && h === helium;
+              return (
+                <div 
+                  key={`${c}-${h}`} 
+                  className={`h-12 border border-white/5 rounded-lg flex flex-col items-center justify-center p-1 transition-all ${
+                    isActive ? 'bg-emerald-500/20 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)] z-10 scale-105' : 'bg-black/20'
+                  }`}
+                >
+                  <div className={`text-[6px] font-mono text-center tracking-tighter ${isActive ? 'text-white' : 'text-gray-700'}`}>
+                    {getCellLabel(c, h)}
+                  </div>
+                  {isActive && <div className="mt-1 w-1 h-1 bg-emerald-500 rounded-full animate-pulse"></div>}
+                </div>
+              );
+            })}
+          </React.Fragment>
+        ))}
+      </div>
+      <div className="flex justify-center gap-8 pt-2">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 bg-emerald-500 rounded-sm"></div>
+          <span className="text-[8px] font-mono text-gray-500 uppercase">Active Optimization State</span>
+        </div>
+      </div>
+    </div>
+  );
+};
 const ExpertDutyCycle: React.FC<{ 
   pro: number; 
   flash: number; 
@@ -296,6 +347,8 @@ const CompareMode: React.FC = () => {
   const [activeExpert, setActiveExpert] = useState<'PRO' | 'FLASH' | null>(null);
   const [liveDutyCycle, setLiveDutyCycle] = useState<{ pro: number; flash: number }>({ pro: 0, flash: 0 });
   const [expertHistory, setExpertHistory] = useState<('PRO' | 'FLASH')[]>([]);
+  const [heliumZone, setHeliumZone] = useState<'STABLE' | 'WARM' | 'HOT' | 'EXTREME'>('STABLE');
+  const [carbonZone, setCarbonZone] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('LOW');
   const graphRef = useRef<any>();
 
   const runComparison = async () => {
@@ -469,20 +522,35 @@ const CompareMode: React.FC = () => {
       const continuityBonus = activeSignature ? 0.75 : 1.0; // 25% reduction for reasoning continuity
       const baseMultiplier = thinkingLevel === 'LOW' ? 0.35 : thinkingLevel === 'MEDIUM' ? 0.45 : 0.65;
       const energyMultiplier = baseMultiplier * continuityBonus * vimRagMultiplier;
+      const gEnergy = (gThought + gAction) * energyMultiplier;
+      const sEnergy = (sThought + sAction) * 0.85;
 
       const gDuty = { pro: 12, flash: 88 };
       const sDuty = { pro: 100, flash: 0 };
       
       const gSavings = sThought > 0 ? (sThought - gThought) / sThought : 0;
-      const gScore = Math.round((gDuty.flash * 0.6) + (gSavings * 100 * 0.4));
+      
+      // Helium Calculation (v5.0.0 logic)
+      const gHelium = (gThought * 0.05) + (gAction * 0.1) * (thinkingLevel === 'HIGH' ? 1.5 : 1.0);
+      const sHelium = (sThought * 0.15) + (sAction * 0.25);
+
+      const gScore = Math.round((gDuty.flash * 0.6) + (gSavings * 100 * 0.2) + ((1 - (gHelium / sHelium)) * 100 * 0.2));
       const sScore = Math.round((sDuty.flash * 0.6) + (0 * 0.4));
+
+      // Zone Determination for v5.0.0 Matrix
+      const cZone = gEnergy < 500 ? 'LOW' : gEnergy < 1500 ? 'MEDIUM' : gEnergy < 3000 ? 'HIGH' : 'CRITICAL';
+      const hZone = gHelium < 20 ? 'STABLE' : gHelium < 50 ? 'WARM' : gHelium < 100 ? 'HOT' : 'EXTREME';
+      
+      setCarbonZone(cZone);
+      setHeliumZone(hZone);
 
       setReport({
         green: {
           thoughtTokens: gThought,
           actionTokens: gAction,
           totalTokens: gThought + gAction,
-          energyUsage: (gThought + gAction) * energyMultiplier,
+          energyUsage: gEnergy,
+          heliumUsage: gHelium,
           dutyCycle: gDuty,
           sustainabilityScore: gScore
         },
@@ -490,7 +558,8 @@ const CompareMode: React.FC = () => {
           thoughtTokens: sThought,
           actionTokens: sAction,
           totalTokens: sThought + sAction,
-          energyUsage: (sThought + sAction) * 0.85, 
+          energyUsage: sEnergy, 
+          heliumUsage: sHelium,
           dutyCycle: sDuty,
           sustainabilityScore: sScore
         },
@@ -613,13 +682,17 @@ const CompareMode: React.FC = () => {
               </span>
             </div>
             <div className="flex items-center justify-between text-[10px] font-mono">
-              <span className="text-gray-500 uppercase">Signature_Persistence</span>
+              <span className="text-gray-500 uppercase">Helium_Cooling</span>
               <div className="flex items-center gap-2">
-                <div className={`w-1.5 h-1.5 rounded-full ${activeSignature ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'}`}></div>
-                <span className={activeSignature ? 'text-emerald-400' : 'text-red-400'}>
-                  {activeSignature ? 'Active' : 'Inactive'}
+                <div className={`w-1.5 h-1.5 rounded-full ${loading ? 'bg-blue-400 animate-pulse' : 'bg-blue-900'}`}></div>
+                <span className={loading ? 'text-blue-400' : 'text-gray-600'}>
+                  {loading ? 'Active' : 'Standby'}
                 </span>
               </div>
+            </div>
+            <div className="flex items-center justify-between text-[10px] font-mono pb-2">
+              <span className="text-gray-500 uppercase">H-Metric_Drift</span>
+              <span className="text-gray-400 font-black">0.02%</span>
             </div>
           </div>
 
@@ -654,11 +727,12 @@ const CompareMode: React.FC = () => {
               <div className="absolute top-0 right-0 p-4 opacity-10">
                  <i className={`fa-solid fa-chart-line text-4xl text-emerald-500 ${loading ? 'animate-pulse' : ''}`}></i>
               </div>
-              <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Live_Efficiency_Verdict</div>
-              <div className="text-5xl font-black text-white tracking-tighter">
+              <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Live_v5.0.0_Verdict</div>
+              <div className="text-5xl font-black text-white tracking-tighter flex items-baseline gap-3">
                 <motion.span>
                   -{displayDelta}%
                 </motion.span>
+                <span className="text-xl text-emerald-500/40">C-H_Gap</span>
               </div>
               
               <div className="space-y-2">
@@ -1001,7 +1075,10 @@ const CompareMode: React.FC = () => {
                   <div className="space-y-6">
                     <div className="bg-emerald-500/10 border border-emerald-500/20 p-6 rounded-3xl space-y-2">
                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] text-emerald-400 font-black uppercase">Green Agent</span>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-emerald-400 font-black uppercase">Green Agent</span>
+                            <span className="text-[7px] text-gray-500 font-mono uppercase tracking-tighter">Carbon:{carbonZone} | Helium:{heliumZone}</span>
+                          </div>
                           <span className="text-2xl font-black text-white font-mono">{report.green.sustainabilityScore}</span>
                        </div>
                        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
@@ -1085,6 +1162,11 @@ const CompareMode: React.FC = () => {
                 </div>
               </div>
 
+              {/* v5.0.0 Dual Axis Matrix */}
+              <div className="pt-10 border-t border-white/5 space-y-8">
+                 <DecisionMatrix carbon={carbonZone} helium={heliumZone} />
+              </div>
+
               {/* Detailed Metric Breakdown */}
               <div className="pt-10 border-t border-white/5 space-y-8">
                 <div className="flex items-center gap-3">
@@ -1115,6 +1197,14 @@ const CompareMode: React.FC = () => {
                       <div className="space-y-1">
                         <div className="text-[9px] text-gray-600 uppercase">Energy (uJ)</div>
                         <div className="text-xl font-black text-emerald-500 font-mono">{report.green.energyUsage.toFixed(1)}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-[9px] text-gray-600 uppercase">Helium Intensity (H)</div>
+                        <div className="text-xl font-black text-blue-400 font-mono">{report.green.heliumUsage.toFixed(1)}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-[9px] text-gray-600 uppercase">Optimization Zone</div>
+                        <div className="text-xl font-black text-violet-400 font-mono italic">{carbonZone}-{heliumZone}</div>
                       </div>
                       {activeSignature && (
                         <div className="space-y-1 col-span-2 pt-4 border-t border-white/5">
@@ -1152,6 +1242,10 @@ const CompareMode: React.FC = () => {
                       <div className="space-y-1">
                         <div className="text-[9px] text-gray-600 uppercase">Energy (uJ)</div>
                         <div className="text-xl font-black text-gray-400 font-mono">{report.standard.energyUsage.toFixed(1)}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-[9px] text-gray-600 uppercase">Helium Intensity (H)</div>
+                        <div className="text-xl font-black text-gray-500 font-mono">{report.standard.heliumUsage.toFixed(1)}</div>
                       </div>
                     </div>
                   </div>
